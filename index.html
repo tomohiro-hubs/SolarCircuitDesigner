@@ -310,7 +310,44 @@
       return warnings;
     }
 
-    function calculateDesign(panel, pcsList, condition) {
+    function calculateDesign(_panel, _pcsList, _condition) {
+      // --- Data Sanitization: Ensure all numbers are actually numbers ---
+      const panel = {
+        ..._panel,
+        voc: Number(_panel.voc) || 0,
+        vmp: Number(_panel.vmp) || 0,
+        isc: Number(_panel.isc) || 0,
+        imp: Number(_panel.imp) || 0,
+        pmax: Number(_panel.pmax) || 0,
+        moduleCount: Number(_panel.moduleCount) || 0,
+        tempCoeffVoc: Number(_panel.tempCoeffVoc) || 0,
+        tempCoeffIsc: Number(_panel.tempCoeffIsc) || 0,
+      };
+      
+      const condition = {
+        ..._condition,
+        minTemperature: Number(_condition.minTemperature) || 0,
+        targetOverloadRatio: Number(_condition.targetOverloadRatio) || 0,
+        manualSeriesCount: Number(_condition.manualSeriesCount) || 0,
+      };
+
+      const pcsList = _pcsList.map(pcs => ({
+        ...pcs,
+        ratedPower: Number(pcs.ratedPower) || 0,
+        totalCircuits: Number(pcs.totalCircuits) || 0,
+        mpptCount: Number(pcs.mpptCount) || 0,
+        ratedInputVoltage: Number(pcs.ratedInputVoltage) || 0,
+        startupVoltage: Number(pcs.startupVoltage) || 0,
+        maxInputVoltage: Number(pcs.maxInputVoltage) || 0,
+        mpptMinVoltage: Number(pcs.mpptMinVoltage) || 0,
+        mpptMaxVoltage: Number(pcs.mpptMaxVoltage) || 0,
+        maxInputCurrentPerCircuit: Number(pcs.maxInputCurrentPerCircuit) || 0,
+        maxIscPerCircuit: Number(pcs.maxIscPerCircuit) || 0,
+        maxIscTotal: Number(pcs.maxIscTotal) || 0,
+        efficiency: Number(pcs.efficiency) || 0,
+      }));
+      // ------------------------------------------------------------
+
       const vocColdModule = calculateVocCold(panel, condition.minTemperature);
       
       if (pcsList.length === 0) return createEmptyResult();
@@ -624,7 +661,7 @@
     // ==========================================
 
     // --- Generic Input Field ---
-    const InputField = ({ label, value, onChange, unit, type = "number", step = "any", min, error, disabled }) => (
+    const InputField = ({ label, value, onChange, unit, type = "number", step = "any", min, error, disabled, bgClass = "bg-slate-50" }) => (
       <div className="space-y-1">
         <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">{label}</label>
         <div className="relative">
@@ -642,7 +679,7 @@
             step={step}
             min={min}
             disabled={disabled}
-            className={`w-full bg-slate-50 border ${error ? 'border-red-300 focus:ring-red-200' : 'border-slate-200 focus:ring-indigo-200'} rounded-lg px-3 py-2 text-sm font-medium text-slate-700 focus:outline-none focus:ring-4 transition-all disabled:opacity-60 disabled:cursor-not-allowed`}
+            className={`w-full ${bgClass} border ${error ? 'border-red-300 focus:ring-red-200' : 'border-slate-200 focus:ring-indigo-200'} rounded-lg px-3 py-2 text-sm font-medium text-slate-700 focus:outline-none focus:ring-4 transition-all disabled:opacity-60 disabled:cursor-not-allowed`}
           />
           {unit && <span className="absolute right-3 top-2 text-xs text-slate-400 font-bold">{unit}</span>}
         </div>
@@ -684,6 +721,9 @@
                 <option value="CUSTOM">カスタム (手動入力)</option>
             </select>
           </div>
+          <p className="text-xs text-red-500 mt-2 font-bold">
+            ※ パネルの仕様は必ず仕様書を確認して数値が間違っていないか確認してください
+          </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
@@ -696,7 +736,13 @@
           <InputField label="Vmp (動作電圧)" value={panel.vmp} onChange={(v) => onChange('vmp', v)} unit="V" disabled={!isEditable} />
           <InputField label="Isc (短絡電流)" value={panel.isc} onChange={(v) => onChange('isc', v)} unit="A" disabled={!isEditable} />
           <InputField label="Imp (動作電流)" value={panel.imp} onChange={(v) => onChange('imp', v)} unit="A" disabled={!isEditable} />
-          <InputField label="総枚数" value={panel.moduleCount} onChange={(v) => onChange('moduleCount', v)} unit="枚" />
+          <InputField 
+            label="総枚数" 
+            value={panel.moduleCount} 
+            onChange={(v) => onChange('moduleCount', v)} 
+            unit="枚" 
+            bgClass="bg-yellow-50 border-yellow-200 focus:ring-yellow-100"
+          />
           <InputField label="温度係数 (Voc)" value={panel.tempCoeffVoc} onChange={(v) => onChange('tempCoeffVoc', v)} unit="%/℃" disabled={!isEditable} />
           <InputField label="温度係数 (Isc)" value={panel.tempCoeffIsc} onChange={(v) => onChange('tempCoeffIsc', v)} unit="%/℃" disabled={!isEditable} />
           
@@ -834,41 +880,53 @@
     // --- DesignGuidePanel ---
     const DesignGuidePanel = ({ panel, pcsList, condition }) => {
       const pcs = pcsList[0];
-      if (!pcs || !panel.voc) return null;
+      
+      // 数値変換ヘルパー（安全対策）
+      const safeNum = (val) => {
+        const n = Number(val);
+        return Number.isFinite(n) ? n : 0;
+      };
+
+      // 必須項目のチェック (数値変換後にチェック)
+      const vocVal = safeNum(panel.voc);
+      if (!pcs || vocVal === 0) return null;
 
       // Constants & Assumptions
-      const T_cold = condition.minTemperature;
+      const T_cold = safeNum(condition.minTemperature);
       const T_hot = 70; // 想定最高セル温度
       const T_typ = 45; // 常用セル温度
       const SafetyMarginVoc = 0.95;
       
       // Coefficients
-      // β_Vmp ≒ α_Voc と仮定 (プロンプト指示)
-      const alphaVoc = panel.tempCoeffVoc / 100;
+      // β_Vmp ≒ α_Voc と仮定
+      const alphaVoc = safeNum(panel.tempCoeffVoc) / 100;
       const betaVmp = alphaVoc; 
 
       // 1. N_max: Voc Check (Cold)
-      const vocColdModule = panel.voc * (1 + alphaVoc * (T_cold - 25));
-      const nMaxRaw = pcs.maxInputVoltage / vocColdModule;
+      const vocColdModule = vocVal * (1 + alphaVoc * (T_cold - 25));
+      const pcsMaxInputVoltage = safeNum(pcs.maxInputVoltage);
+      const nMaxRaw = pcsMaxInputVoltage / (vocColdModule || 1); // 0除算回避
       const nMax = Math.floor(nMaxRaw * SafetyMarginVoc);
 
       // 2. N_min: Vmp Check (Hot)
-      const vmpHotModule = panel.vmp * (1 + betaVmp * (T_hot - 25));
+      const vmpVal = safeNum(panel.vmp);
+      const vmpHotModule = vmpVal * (1 + betaVmp * (T_hot - 25));
+      const pcsMpptMinVoltage = safeNum(pcs.mpptMinVoltage);
       // 実務的にはFull Power下限(例:580V)を見るが、データがないのでMPPT下限を使用しつつ注記
-      const nMinMppt = Math.ceil(pcs.mpptMinVoltage / vmpHotModule);
+      const nMinMppt = Math.ceil(pcsMpptMinVoltage / (vmpHotModule || 1));
       
       // 3. Best Zone (Typical Temp vs Rated Voltage)
       // 定格入力電圧 (なければ600Vと仮定)
-      const vRated = pcs.ratedInputVoltage || 600; 
-      const vmpTypModule = panel.vmp * (1 + betaVmp * (T_typ - 25));
+      const vRated = safeNum(pcs.ratedInputVoltage) || 600; 
+      const vmpTypModule = vmpVal * (1 + betaVmp * (T_typ - 25));
       
       // ベストゾーン: 定格の 0.9 ~ 1.2倍
       const vBestMin = vRated * 0.9;
       const vBestMax = vRated * 1.2;
       
       // この電圧範囲に入るN
-      const nBestMin = Math.ceil(vBestMin / vmpTypModule);
-      const nBestMax = Math.floor(vBestMax / vmpTypModule);
+      const nBestMin = Math.ceil(vBestMin / (vmpTypModule || 1));
+      const nBestMax = Math.floor(vBestMax / (vmpTypModule || 1));
       
       // 範囲オーバーラップチェック
       const nGuideMin = Math.max(nMinMppt, nBestMin);
@@ -876,13 +934,16 @@
       const isFeasible = nGuideMin <= nGuideMax;
 
       // 4. Current Check (Imp & Isc)
-      const currentLimit = pcs.maxInputCurrentPerCircuit; // MPPTあたりの最大入力電流と仮定
-      const iscLimit = pcs.maxIscPerCircuit; // MPPTあたりの最大短絡電流
+      const currentLimit = safeNum(pcs.maxInputCurrentPerCircuit); // MPPTあたりの最大入力電流と仮定
+      const iscLimit = safeNum(pcs.maxIscPerCircuit); // MPPTあたりの最大短絡電流
       
-      const imp1 = panel.imp;
-      const imp2 = panel.imp * 2;
-      const isc1 = panel.isc;
-      const isc2 = panel.isc * 2;
+      const impVal = safeNum(panel.imp);
+      const iscVal = safeNum(panel.isc);
+      
+      const imp1 = impVal;
+      const imp2 = impVal * 2;
+      const isc1 = iscVal;
+      const isc2 = iscVal * 2;
       
       const isImp1Ok = imp1 <= currentLimit;
       const isImp2Ok = imp2 <= currentLimit;
@@ -960,7 +1021,7 @@
                 <div className="bg-white p-4 rounded border border-slate-200 text-xs">
                     <div className="flex justify-between items-center mb-2 pb-2 border-b border-slate-100">
                         <span className="text-slate-500">パネル Imp / Isc</span>
-                        <span className="font-bold text-slate-700">{panel.imp} A / {panel.isc} A</span>
+                        <span className="font-bold text-slate-700">{impVal.toFixed(2)} A / {iscVal.toFixed(2)} A</span>
                     </div>
                     <div className="flex justify-between items-center">
                         <span className="text-slate-500">PCS最大入力電流 (MPPT)</span>
@@ -1455,7 +1516,13 @@
       }, [panelPresets]);
 
       const handlePcsChange = useCallback((id, field, value) => setPcsList(prev => prev.map(pcs => pcs.id === id ? { ...pcs, [field]: value } : pcs)), []);
-      const handleAddPcs = useCallback(() => setPcsList(prev => [...prev, { ...INITIAL_PCS, id: `PCS${prev.length + 1}` }]), []);
+      
+      const handleAddPcs = useCallback(() => setPcsList(prev => {
+        const lastPcs = prev[prev.length - 1];
+        const baseData = lastPcs ? { ...lastPcs } : { ...INITIAL_PCS };
+        return [...prev, { ...baseData, id: `PCS${prev.length + 1}` }];
+      }), []);
+
       const handleRemovePcs = useCallback((id) => setPcsList(prev => prev.filter(pcs => pcs.id !== id)), []);
       const handleConditionChange = useCallback((field, value) => setCondition(prev => ({ ...prev, [field]: value })), []);
       
