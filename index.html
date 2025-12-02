@@ -1062,6 +1062,34 @@
               ※ 2回路並列/MPPTとは、1つのMPPT入力に対して2つのストリングを接続する構成(例: 入力1-2で1MPPTなど)を指します。
               NGの場合、クリッピング損失が発生したり、安全上のリスクがあるため接続できません。
             </p>
+
+            <div className="mt-4 p-4 bg-slate-50 rounded border border-slate-200 text-[11px] text-slate-600 leading-relaxed space-y-3">
+                <p className="font-bold border-b border-slate-200 pb-1">【パワーコンディショナの入力系統における許容電流の取り扱い原則】</p>
+                <p>
+                    入力系統（MPPT）の許容電流、ストリング単位の定格電流、入力短絡電流の上限は、それぞれ独立した設計上の制約として扱います。
+                </p>
+                <div className="pl-2 border-l-2 border-slate-300">
+                    <p className="mb-1">
+                        ストリングを並列接続した場合、並列合成電流の計算値が入力系統の許容電流値を上回る場合でも、実際の入力電流は当該許容値により制限されます（ピークカット）。
+                    </p>
+                    <div className="bg-white p-2 rounded border border-slate-100 text-slate-500 my-1">
+                        <p className="font-bold text-[10px] mb-1">例：</p>
+                        <ul className="list-disc list-inside">
+                            <li>ストリング電流が 17A</li>
+                            <li>2並列で 34A</li>
+                            <li>MPPT側の許容電流が 30A</li>
+                        </ul>
+                        <p className="mt-1 text-indigo-600 font-bold">→ 実際に扱われる電流は 30A に制限される。</p>
+                    </div>
+                    <p>このような構成は動作としては成立しますが、推奨される設計とは限らない点にご注意ください。</p>
+                </div>
+                <p>
+                    ストリングの短絡電流については、並列構成による合成短絡電流が入力短絡電流の許容上限を超える場合、<span className="font-bold text-red-600">接続不可</span>と判断します。
+                </p>
+                <p className="font-bold text-red-500 pt-2 border-t border-slate-200">
+                    いずれかの仕様値を超過する構成は、安全性および機器仕様遵守の観点から不適合となります。
+                </p>
+            </div>
           </div>
         </section>
       );
