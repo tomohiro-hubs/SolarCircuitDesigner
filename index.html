@@ -14,6 +14,9 @@
   
   <!-- Babel Standalone -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <!-- SheetJS (xlsx) -->
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
   
   <!-- Font Awesome -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -41,7 +44,7 @@
     // ==========================================
     // Data Source: Panel Presets
     // ==========================================
-    const PANEL_PRESETS = [
+    const DEFAULT_PANEL_PRESETS = [
       { manufacturer: "Aiko Energy Japan", model: "AIKO-G640-MCH72Dｗ", vmp: 45.11, imp: 14.19, pmax: 640, voc: 54.3, isc: 14.96, tempCoeffVoc: -0.26, tempCoeffIsc: 0.05 },
       { manufacturer: "Aiko Energy Japan", model: "AIKO-A615-MAH72Mw", vmp: 45.51, imp: 13.51, pmax: 615, voc: 53.7, isc: 14.09, tempCoeffVoc: -0.24, tempCoeffIsc: 0.05 },
       { manufacturer: "Chint New Energy", model: "CHSM78N(DG)/F-BH635", vmp: 46.62, imp: 13.62, pmax: 635, voc: 56.41, isc: 14.27, tempCoeffVoc: -0.29, tempCoeffIsc: "" },
@@ -485,8 +488,139 @@
       };
     }
 
+    // --- Excel Export Logic ---
+    const exportToExcel = (result, panel, pcsList, condition) => {
+        if (!result) return;
+
+        const wb = XLSX.utils.book_new();
+        const now = new Date().toLocaleString();
+
+        // --- Sheet 1: 設計サマリー ---
+        const summaryRows = [
+            ["Solar Circuit Designer - 設計シミュレーション結果報告書"],
+            ["出力日時", now],
+            [],
+            ["【1. 設置条件】"],
+            ["想定最低気温", `${condition.minTemperature} ℃`],
+            ["目標過積載率", `${condition.targetOverloadRatio} %`],
+            [],
+            ["【2. パネル仕様】"],
+            ["メーカー", panel.manufacturer],
+            ["型式", panel.model],
+            ["最大出力 (Pmax)", `${panel.pmax} W`],
+            ["開放電圧 (Voc)", `${panel.voc} V`],
+            ["動作電圧 (Vmp)", `${panel.vmp} V`],
+            ["短絡電流 (Isc)", `${panel.isc} A`],
+            ["動作電流 (Imp)", `${panel.imp} A`],
+            ["温度係数(Voc)", `${panel.tempCoeffVoc} %/℃`],
+            ["パネル総数", `${panel.moduleCount} 枚`],
+            [],
+            ["【3. 全体設計結果】"],
+            ["PVシステム総容量", `${result.totalPvCapacityKw.toFixed(2)} kW`],
+            ["PCS定格総出力", `${result.totalPcsCapacityKw.toFixed(2)} kW`],
+            ["全体過積載率", `${result.totalOverloadRatio.toFixed(1)} %`],
+            ["未配置パネル数", `${panel.moduleCount - result.summaries.reduce((acc, s) => acc + s.totalModulesAssigned, 0)} 枚`],
+            [],
+            ["【4. PCS別サマリー】"],
+            ["PCS ID", "型式", "定格出力(kW)", "PV入力(kW)", "過積載率(%)", "使用回路数", "入力枚数", "判定"],
+        ];
+
+        result.summaries.forEach(s => {
+            const pcs = pcsList.find(p => p.id === s.pcsId);
+            const status = s.warnings.length > 0 ? `要確認: ${s.warnings.join(", ")}` : "OK";
+            summaryRows.push([
+                s.pcsId,
+                pcs ? pcs.model : "-",
+                s.pcsCapacityKw.toFixed(2),
+                s.pvCapacityKw.toFixed(2),
+                s.overloadRatio.toFixed(1),
+                `${s.usedCircuits} / ${pcs ? pcs.totalCircuits : "-"}`,
+                s.totalModulesAssigned,
+                status
+            ]);
+        });
+        
+        // グローバル警告があれば追加
+        if (result.globalWarnings.length > 0) {
+            summaryRows.push([], ["【全体警告・注意事項】"]);
+            result.globalWarnings.forEach(w => summaryRows.push([w]));
+        }
+
+        const wsSummary = XLSX.utils.aoa_to_sheet(summaryRows);
+        
+        // 列幅調整 (簡易)
+        wsSummary['!cols'] = [
+            { wch: 25 }, { wch: 25 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 50 }
+        ];
+
+        XLSX.utils.book_append_sheet(wb, wsSummary, "設計サマリー");
+
+        // --- Sheet 2: 回路割付詳細 ---
+        const detailHeader = [
+            "PCS ID", "回路No", "MPPTグループ", "直列数(枚)", 
+            "ストリングVmp(V)", "ストリングVoc低温(V)", 
+            "パネルImp(A)", "パネルIsc(A)", 
+            "判定/警告"
+        ];
+        
+        const detailRows = [detailHeader];
+
+        // Sort assignments by PCS ID then Circuit Index
+        const sortedAssignments = [...result.assignments].sort((a, b) => {
+            if (a.pcsId !== b.pcsId) return a.pcsId.localeCompare(b.pcsId);
+            return a.circuitIndex - b.circuitIndex;
+        });
+
+        sortedAssignments.forEach(a => {
+            const pcs = pcsList.find(p => p.id === a.pcsId);
+            const n = a.stringDesign?.seriesModules || 0;
+            let vmp = 0, voc = 0;
+            let status = "未使用";
+            
+            if (n > 0) {
+                vmp = a.stringDesign.vmpString;
+                voc = a.stringDesign.vocStringCold;
+                
+                // 個別回路の警告チェック（簡易再判定）
+                const warnings = [];
+                // 電圧
+                if (pcs) {
+                    if (vmp < pcs.mpptMinVoltage) warnings.push(`Vmp下限割れ(${vmp.toFixed(1)}V)`);
+                    if (vmp > pcs.mpptMaxVoltage) warnings.push(`Vmp上限超過(${vmp.toFixed(1)}V)`);
+                    if (voc > pcs.maxInputVoltage) warnings.push(`最大入力超過(${voc.toFixed(1)}V)`);
+                }
+                status = warnings.length > 0 ? `NG: ${warnings.join(", ")}` : "OK";
+            }
+
+            detailRows.push([
+                a.pcsId,
+                a.circuitIndex,
+                a.mpptGroupIndex,
+                n > 0 ? n : "-",
+                n > 0 ? vmp.toFixed(1) : "-",
+                n > 0 ? voc.toFixed(1) : "-",
+                n > 0 ? panel.imp : "-",
+                n > 0 ? panel.isc : "-",
+                status
+            ]);
+        });
+
+        const wsDetail = XLSX.utils.aoa_to_sheet(detailRows);
+        wsDetail['!cols'] = [
+            { wch: 10 }, { wch: 8 }, { wch: 12 }, { wch: 12 }, 
+            { wch: 15 }, { wch: 20 }, { wch: 12 }, { wch: 12 }, { wch: 40 }
+        ];
+
+        XLSX.utils.book_append_sheet(wb, wsDetail, "回路割付詳細");
+
+        // --- File Write ---
+        const filename = `SolarDesign_${new Date().toISOString().slice(0,10)}.xlsx`;
+        XLSX.writeFile(wb, filename);
+    };
+
     // ==========================================
     // Components
+
     // ==========================================
 
     // --- Generic Input Field ---
@@ -517,8 +651,15 @@
     );
 
     // --- Panel Form ---
-    const PanelForm = ({ panel, onChange, onPresetSelect }) => {
-      const isCustom = !PANEL_PRESETS.some(p => p.model === panel.model);
+    const PanelForm = ({ panel, onChange, onPresetSelect, presets, onSaveCustom }) => {
+      const isCustom = !DEFAULT_PANEL_PRESETS.some(p => p.model === panel.model);
+      // Use the passed presets prop for checking if it's in the list
+      // But for "isEditable" check, we want to allow editing if it's NOT in the DEFAULT presets 
+      // OR if it's in the custom ones? Usually once saved as preset, we treat it as read-only preset to avoid confusion.
+      // But let's allow editing if the user explicitly selected "CUSTOM" which clears the model name.
+      // If a model name is present and it matches ANY preset (default or custom), we disable fields.
+      
+      const isEditable = panel.model === '' || !presets.some(p => p.model === panel.model);
 
       return (
       <section className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
@@ -530,33 +671,49 @@
         {/* Preset Selector */}
         <div className="mb-6 bg-slate-50 p-4 rounded-lg border border-slate-200">
           <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-2">パネル型式選択</label>
-          <select 
-            className="w-full p-2 rounded border border-slate-300 text-sm"
-            value={isCustom ? "CUSTOM" : panel.model}
-            onChange={(e) => onPresetSelect(e.target.value)}
-          >
-            <option value="" disabled>型式を選択してください</option>
-            {PANEL_PRESETS.map(p => (
-              <option key={p.model} value={p.model}>{p.manufacturer} | {p.model} ({p.pmax}W)</option>
-            ))}
-            <option value="CUSTOM">カスタム (手動入力)</option>
-          </select>
+          <div className="flex gap-2">
+            <select 
+                className="w-full p-2 rounded border border-slate-300 text-sm"
+                value={isEditable ? "CUSTOM" : panel.model}
+                onChange={(e) => onPresetSelect(e.target.value)}
+            >
+                <option value="" disabled>型式を選択してください</option>
+                {presets.map(p => (
+                <option key={p.model} value={p.model}>{p.manufacturer} | {p.model} ({p.pmax}W)</option>
+                ))}
+                <option value="CUSTOM">カスタム (手動入力)</option>
+            </select>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-          <InputField label="メーカー" value={panel.manufacturer} onChange={(v) => onChange('manufacturer', v)} type="text" disabled={!isCustom} />
-          <InputField label="型式" value={panel.model} onChange={(v) => onChange('model', v)} type="text" disabled={!isCustom} />
+          <InputField label="メーカー" value={panel.manufacturer} onChange={(v) => onChange('manufacturer', v)} type="text" disabled={!isEditable} />
+          <InputField label="型式" value={panel.model} onChange={(v) => onChange('model', v)} type="text" disabled={!isEditable} />
         </div>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-          <InputField label="Pmax (定格出力)" value={panel.pmax} onChange={(v) => onChange('pmax', v)} unit="W" disabled={!isCustom} />
-          <InputField label="Voc (開放電圧)" value={panel.voc} onChange={(v) => onChange('voc', v)} unit="V" disabled={!isCustom} />
-          <InputField label="Vmp (動作電圧)" value={panel.vmp} onChange={(v) => onChange('vmp', v)} unit="V" disabled={!isCustom} />
-          <InputField label="Isc (短絡電流)" value={panel.isc} onChange={(v) => onChange('isc', v)} unit="A" disabled={!isCustom} />
-          <InputField label="Imp (動作電流)" value={panel.imp} onChange={(v) => onChange('imp', v)} unit="A" disabled={!isCustom} />
+          <InputField label="Pmax (定格出力)" value={panel.pmax} onChange={(v) => onChange('pmax', v)} unit="W" disabled={!isEditable} />
+          <InputField label="Voc (開放電圧)" value={panel.voc} onChange={(v) => onChange('voc', v)} unit="V" disabled={!isEditable} />
+          <InputField label="Vmp (動作電圧)" value={panel.vmp} onChange={(v) => onChange('vmp', v)} unit="V" disabled={!isEditable} />
+          <InputField label="Isc (短絡電流)" value={panel.isc} onChange={(v) => onChange('isc', v)} unit="A" disabled={!isEditable} />
+          <InputField label="Imp (動作電流)" value={panel.imp} onChange={(v) => onChange('imp', v)} unit="A" disabled={!isEditable} />
           <InputField label="総枚数" value={panel.moduleCount} onChange={(v) => onChange('moduleCount', v)} unit="枚" />
-          <InputField label="温度係数 (Voc)" value={panel.tempCoeffVoc} onChange={(v) => onChange('tempCoeffVoc', v)} unit="%/℃" disabled={!isCustom} />
-          <InputField label="温度係数 (Isc)" value={panel.tempCoeffIsc} onChange={(v) => onChange('tempCoeffIsc', v)} unit="%/℃" disabled={!isCustom} />
+          <InputField label="温度係数 (Voc)" value={panel.tempCoeffVoc} onChange={(v) => onChange('tempCoeffVoc', v)} unit="%/℃" disabled={!isEditable} />
+          <InputField label="温度係数 (Isc)" value={panel.tempCoeffIsc} onChange={(v) => onChange('tempCoeffIsc', v)} unit="%/℃" disabled={!isEditable} />
           
+          {/* Save Button for Custom */}
+          {isEditable && (
+            <div className="flex items-end">
+                <button 
+                    onClick={onSaveCustom}
+                    className="h-[42px] w-full bg-indigo-50 text-indigo-600 border border-indigo-200 rounded-lg font-bold text-xs hover:bg-indigo-100 transition-colors flex items-center justify-center gap-1"
+                    title="入力した内容をブラウザに保存します"
+                >
+                    <i className="fa-solid fa-save"></i>
+                    プリセット保存
+                </button>
+            </div>
+          )}
+
           {/* DC Capacity Display */}
           <div className="flex flex-col justify-end">
             <div className="space-y-1">
@@ -855,6 +1012,16 @@
 
       return (
         <section className="space-y-6">
+          <div className="flex justify-end">
+            <button
+                onClick={() => exportToExcel(result, panel, pcsList, { minTemperature: -10, targetOverloadRatio: 120 })} 
+                className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2 px-4 rounded-lg flex items-center gap-2 shadow-sm transition-all"
+            >
+                <i className="fa-solid fa-file-excel"></i>
+                Excel出力
+            </button>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             {/* Voltage Info Card */}
             <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-200 flex flex-col justify-between relative overflow-hidden group">
@@ -1222,7 +1389,47 @@
     };
 
     function App() {
+      const [panelPresets, setPanelPresets] = useState([]);
       const [panel, setPanel] = useState(INITIAL_PANEL);
+      
+      // Initialize presets from default + localStorage
+      useEffect(() => {
+        const stored = localStorage.getItem('customPanelPresets');
+        const customs = stored ? JSON.parse(stored) : [];
+        setPanelPresets([...DEFAULT_PANEL_PRESETS, ...customs]);
+      }, []);
+
+      const handleSaveCustomPanel = useCallback(() => {
+        if (!panel.manufacturer || !panel.model) {
+          alert('保存するにはメーカーと型式を入力してください');
+          return;
+        }
+        const newPreset = {
+          manufacturer: panel.manufacturer,
+          model: panel.model,
+          pmax: Number(panel.pmax),
+          voc: Number(panel.voc),
+          vmp: Number(panel.vmp),
+          isc: Number(panel.isc),
+          imp: Number(panel.imp),
+          tempCoeffVoc: Number(panel.tempCoeffVoc),
+          tempCoeffIsc: Number(panel.tempCoeffIsc)
+        };
+        
+        // Save to localStorage
+        const stored = localStorage.getItem('customPanelPresets');
+        const customs = stored ? JSON.parse(stored) : [];
+        // Remove duplicate if exists
+        const filtered = customs.filter(p => p.model !== newPreset.model);
+        const updatedCustoms = [...filtered, newPreset];
+        
+        localStorage.setItem('customPanelPresets', JSON.stringify(updatedCustoms));
+        
+        // Update State
+        setPanelPresets([...DEFAULT_PANEL_PRESETS, ...updatedCustoms]);
+        alert(`カスタムパネル「${newPreset.model}」をブラウザに保存しました`);
+      }, [panel]);
+
       const [pcsList, setPcsList] = useState([INITIAL_PCS]);
       const [condition, setCondition] = useState(INITIAL_CONDITION);
       const [result, setResult] = useState(null);
@@ -1239,12 +1446,13 @@
                 // keep moduleCount
             }));
         } else {
-            const preset = PANEL_PRESETS.find(p => p.model === modelName);
+            // Search in panelPresets state instead of constant
+            const preset = panelPresets.find(p => p.model === modelName);
             if (preset) {
                 setPanel(prev => ({ ...prev, ...preset }));
             }
         }
-      }, []);
+      }, [panelPresets]);
 
       const handlePcsChange = useCallback((id, field, value) => setPcsList(prev => prev.map(pcs => pcs.id === id ? { ...pcs, [field]: value } : pcs)), []);
       const handleAddPcs = useCallback(() => setPcsList(prev => [...prev, { ...INITIAL_PCS, id: `PCS${prev.length + 1}` }]), []);
@@ -1449,7 +1657,13 @@
               
               {/* Left Column */}
               <div className="xl:col-span-5 space-y-6 xl:sticky xl:top-24 overflow-y-auto xl:max-h-[calc(100vh-8rem)] scrollbar-hide pb-4">
-                <PanelForm panel={panel} onChange={handlePanelChange} onPresetSelect={handlePanelPresetSelect} />
+                <PanelForm 
+                    panel={panel} 
+                    onChange={handlePanelChange} 
+                    onPresetSelect={handlePanelPresetSelect} 
+                    presets={panelPresets}
+                    onSaveCustom={handleSaveCustomPanel}
+                />
                 <PcsListForm 
                   pcsList={pcsList} 
                   onAdd={handleAddPcs} 
