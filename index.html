@@ -1759,6 +1759,20 @@
                     presets={panelPresets}
                     onSaveCustom={handleSaveCustomPanel}
                 />
+                
+                {/* Simulation Button (Top) */}
+                <button
+                  onClick={handleCalculate}
+                  disabled={isCalculating}
+                  className="w-full py-3 bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-white rounded-lg font-bold shadow transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+                >
+                  {isCalculating ? (
+                    <><i className="fa-solid fa-rotate fa-spin"></i> 計算中...</>
+                  ) : (
+                    <><i className="fa-solid fa-calculator"></i> 設計シミュレーション実行</>
+                  )}
+                </button>
+
                 <PcsListForm 
                   pcsList={pcsList} 
                   onAdd={handleAddPcs} 
