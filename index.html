@@ -45,69 +45,69 @@
     // Data Source: Panel Presets
     // ==========================================
     const DEFAULT_PANEL_PRESETS = [
-      { manufacturer: "Aiko Energy Japan", model: "AIKO-G640-MCH72Dｗ", vmp: 45.11, imp: 14.19, pmax: 640, voc: 54.3, isc: 14.96, tempCoeffVoc: -0.26, tempCoeffIsc: 0.05 },
-      { manufacturer: "Aiko Energy Japan", model: "AIKO-A615-MAH72Mw", vmp: 45.51, imp: 13.51, pmax: 615, voc: 53.7, isc: 14.09, tempCoeffVoc: -0.24, tempCoeffIsc: 0.05 },
-      { manufacturer: "Chint New Energy", model: "CHSM78N(DG)/F-BH635", vmp: 46.62, imp: 13.62, pmax: 635, voc: 56.41, isc: 14.27, tempCoeffVoc: -0.29, tempCoeffIsc: "" },
-      { manufacturer: "Chint New Energy", model: "CHSM78N(DG)/F-BH650", vmp: 47.12, imp: 13.8, pmax: 650, voc: 57.01, isc: 14.51, tempCoeffVoc: -0.29, tempCoeffIsc: 0.36 },
-      { manufacturer: "CHINT NEW ENERGY JAPAN", model: "CHSM72N(DG)/ FB-575", vmp: 42.94, imp: 13.39, pmax: 575, voc: 51.1, isc: 14.19, tempCoeffVoc: -0.25, tempCoeffIsc: 0.043 },
-      { manufacturer: "CHINT NEW ENERGY JAPAN", model: "CHSM72N(DG)/ FB-580", vmp: 43.11, imp: 13.45, pmax: 580, voc: 51.3, isc: 14.28, tempCoeffVoc: -0.25, tempCoeffIsc: 0.043 },
-      { manufacturer: "CHINT NEW ENERGY JAPAN", model: "CHSM72N(DG)/ FB-585", vmp: 43.27, imp: 13.52, pmax: 585, voc: 51.5, isc: 14.36, tempCoeffVoc: -0.25, tempCoeffIsc: 0.043 },
-      { manufacturer: "CHINT NEW ENERGY JAPAN", model: "CHSM72N(DG)/ FB-590", vmp: 43.45, imp: 13.58, pmax: 590, voc: 51.7, isc: 14.45, tempCoeffVoc: -0.25, tempCoeffIsc: 0.043 },
-      { manufacturer: "CHINT NEW ENERGY JAPAN", model: "CHSM72M(DG)/FB595", vmp: 43.61, imp: 13.64, pmax: 595, voc: 51.9, isc: 14.53, tempCoeffVoc: -0.25, tempCoeffIsc: 0.043 },
-      { manufacturer: "CHINT NEW ENERGY JAPAN", model: "CHSM72M(DG)/FB600", vmp: 43.78, imp: 13.7, pmax: 600, voc: 52.1, isc: 14.61, tempCoeffVoc: -0.25, tempCoeffIsc: 0.043 },
-      { manufacturer: "CHINT NEW ENERGY JAPAN", model: "CHSM72M(DG)/FB605", vmp: 43.95, imp: 13.77, pmax: 605, voc: 52.3, isc: 14.7, tempCoeffVoc: -0.25, tempCoeffIsc: 0.043 },
-      { manufacturer: "CHINT NEW ENERGY JAPAN", model: "CHSM72M(DG)/FB610", vmp: 44.12, imp: 13.83, pmax: 610, voc: 52.5, isc: 14.78, tempCoeffVoc: -0.25, tempCoeffIsc: 0.043 },
-      { manufacturer: "JASOLAR", model: "JAM66D46710/LB", vmp: 48.6, imp: 17.4, pmax: 710, voc: 48.6, isc: 18.51, tempCoeffVoc: -0.29, tempCoeffIsc: 0.045 },
-      { manufacturer: "Leapton Energy", model: "LP182*182-M-78-MH-600W", vmp: 45.2, imp: 13.27, pmax: 600, voc: 54.1, isc: 14.08, tempCoeffVoc: -0.28, tempCoeffIsc: 0.36 },
-      { manufacturer: "Leapton Energy", model: "LP182*182-M-78-NB-620W", vmp: 45.76, imp: 13.55, pmax: 620, voc: 55.61, isc: 14.09, tempCoeffVoc: -0.3, tempCoeffIsc: 0.046 },
-      { manufacturer: "LONGi Solar Technology", model: "LR7-72HGD-615M", vmp: 44.22, imp: 13.91, pmax: 615, voc: 52.66, isc: 14.77, tempCoeffVoc: -0.28, tempCoeffIsc: 0.045 },
-      { manufacturer: "LONGi Solar Technology", model: "LR7-72HGD-610M", vmp: 44.11, imp: 13.83, pmax: 610, voc: 52.55, isc: 14.69, tempCoeffVoc: -0.28, tempCoeffIsc: 0.045 },
-      { manufacturer: "LONGi Solar Technology", model: "LR5-72HGD-590M", vmp: 43.44, imp: 13.59, pmax: 590, voc: 51.63, isc: 14.38, tempCoeffVoc: -0.28, tempCoeffIsc: 0.045 },
-      { manufacturer: "LONGi Solar Technology", model: "LR-7-72HYD-660M", vmp: 44.85, imp: 14.72, pmax: 660, voc: 54, isc: 15.41, tempCoeffVoc: -0.26, tempCoeffIsc: "" },
-      { manufacturer: "XSOL", model: "XLN108-460S", vmp: 33.17, imp: 13.87, pmax: 460, voc: 39.7, isc: 14.64, tempCoeffVoc: -0.29, tempCoeffIsc: 0.045 },
-      { manufacturer: "カナディアンソーラージャパン", model: "CS6W-580TB-AG", vmp: 43.1, imp: 13.46, pmax: 580, voc: 52.2, isc: 13.93, tempCoeffVoc: -0.25, tempCoeffIsc: 0.05 },
-      { manufacturer: "カナディアンソーラージャパン", model: "CS6W-560TB-AG", vmp: 42.3, imp: 13.24, pmax: 560, voc: 51.4, isc: 13.69, tempCoeffVoc: -0.25, tempCoeffIsc: 0.05 },
-      { manufacturer: "カナディアンソーラージャパン", model: "CS6W-565TB-AG", vmp: 42.5, imp: 13.3, pmax: 565, voc: 51.6, isc: 13.3, tempCoeffVoc: 0.25, tempCoeffIsc: 0.05 },
-      { manufacturer: "カナディアンソーラージャパン", model: "CS6W-575TB-AG", vmp: 42.9, imp: 13.41, pmax: 575, voc: 52, isc: 13.88, tempCoeffVoc: -0.25, tempCoeffIsc: 0.05 },
-      { manufacturer: "カナディアンソーラージャパン", model: "CS6R-440T", vmp: 32.4, imp: 13.59, pmax: 440, voc: 39.4, isc: 14.01, tempCoeffVoc: -0.25, tempCoeffIsc: 0.05 },
-      { manufacturer: "カナディアンソーラージャパン", model: "CS6W-570TB-AG", vmp: 42.7, imp: 13.35, pmax: 570, voc: 51.8, isc: 13.81, tempCoeffVoc: -0.25, tempCoeffIsc: 0.05 },
-      { manufacturer: "カナディアンソーラージャパン", model: "CS6W-585T", vmp: 43.3, imp: 13.52, pmax: 585, voc: 52.4, isc: 14, tempCoeffVoc: -0.29, tempCoeffIsc: "" },
-      { manufacturer: "カナディアンソーラージャパン", model: "CS6W-585T (AG)", vmp: 43.3, imp: 13.52, pmax: 585, voc: 52.4, isc: 14, tempCoeffVoc: -0.25, tempCoeffIsc: 0.05 },
-      { manufacturer: "カナディアンソーラージャパン", model: "CS6R-415MS", vmp: 31.4, imp: 13.23, pmax: 415, voc: 37.4, isc: 14.09, tempCoeffVoc: -0.26, tempCoeffIsc: 0.05 },
-      { manufacturer: "カナディアンソーラージャパン", model: "CS6.1-72TB-610", vmp: 44.4, imp: 13.74, pmax: 610, voc: 52.2, isc: 14.66, tempCoeffVoc: -0.29, tempCoeffIsc: 0.05 },
-      { manufacturer: "カナディアンソーラージャパン", model: "CS6W-585TB-AG", vmp: 43.3, imp: 13.52, pmax: 585, voc: 52.4, isc: 14, tempCoeffVoc: -0.29, tempCoeffIsc: 0.05 },
-      { manufacturer: "カナディアンソーラージャパン", model: "CS6W-590TB-AG", vmp: 43.5, imp: 13.57, pmax: 590, voc: 52.6, isc: 14.06, tempCoeffVoc: -0.29, tempCoeffIsc: 0.05 },
-      { manufacturer: "カナディアンソーラージャパン", model: "CS6W-595TB-AG", vmp: 43.7, imp: 13.62, pmax: 595, voc: 52.8, isc: 14.12, tempCoeffVoc: -0.29, tempCoeffIsc: 0.05 },
-      { manufacturer: "サンテック", model: "STP585S-C72/Nsh+", vmp: 42.79, imp: 13.67, pmax: 585, voc: 51.55, isc: 14.4, tempCoeffVoc: -0.25, tempCoeffIsc: 0.046 },
-      { manufacturer: "サンテックエナジー", model: "STP555S-C72", vmp: 42.24, imp: 13.14, pmax: 555, voc: 50.07, isc: 14.07, tempCoeffVoc: -0.26, tempCoeffIsc: 0.05 },
-      { manufacturer: "ジンコ・ソーラージャパン", model: "JKM580N-72HL4-BDV-J", vmp: 43.88, imp: 13.22, pmax: 580, voc: 52.5, isc: 13.95, tempCoeffVoc: -0.25, tempCoeffIsc: 0.046 },
-      { manufacturer: "ジンコ・ソーラージャパン", model: "JKM550N-72HL4-BDV", vmp: 41.58, imp: 13.23, pmax: 550, voc: 50.27, isc: 14.01, tempCoeffVoc: -0.25, tempCoeffIsc: 0.046 },
-      { manufacturer: "ジンコ・ソーラージャパン", model: "JKM555N-72HL4-BDV", vmp: 41.77, imp: 13.29, pmax: 555, voc: 50.47, isc: 14.07, tempCoeffVoc: -0.25, tempCoeffIsc: 0.046 },
-      { manufacturer: "ジンコ・ソーラージャパン", model: "JKM560N-72HL4-BDV", vmp: 41.95, imp: 13.35, pmax: 560, voc: 50.67, isc: 14.13, tempCoeffVoc: -0.25, tempCoeffIsc: 0.046 },
-      { manufacturer: "ジンコ・ソーラージャパン", model: "JKM565N-72HL4-BDV", vmp: 42.14, imp: 13.41, pmax: 565, voc: 50.87, isc: 14.19, tempCoeffVoc: -0.25, tempCoeffIsc: 0.046 },
-      { manufacturer: "ジンコ・ソーラージャパン", model: "JKM570N-72HL4-BDV", vmp: 42.29, imp: 13.48, pmax: 570, voc: 51.07, isc: 14.25, tempCoeffVoc: -0.25, tempCoeffIsc: 0.046 },
-      { manufacturer: "ジンコ・ソーラージャパン", model: "JKM590N-78HL4-BDV", vmp: 44.91, imp: 13.14, pmax: 590, voc: 54.76, isc: 13.71, tempCoeffVoc: -0.25, tempCoeffIsc: 0.046 },
-      { manufacturer: "ジンコ・ソーラージャパン", model: "JKM595N-78HL4-BDV", vmp: 45.08, imp: 13.2, pmax: 595, voc: 54.9, isc: 13.79, tempCoeffVoc: -0.25, tempCoeffIsc: 0.046 },
-      { manufacturer: "ジンコ・ソーラージャパン", model: "JKM600N-78HL4-BDV", vmp: 45.25, imp: 13.26, pmax: 600, voc: 55.03, isc: 13.87, tempCoeffVoc: -0.25, tempCoeffIsc: 0.046 },
-      { manufacturer: "ジンコ・ソーラージャパン", model: "JKM605N-78HL4-BDV", vmp: 45.42, imp: 13.32, pmax: 605, voc: 55.17, isc: 13.95, tempCoeffVoc: -0.25, tempCoeffIsc: 0.046 },
-      { manufacturer: "ジンコ・ソーラージャパン", model: "JKM610N-78HL4-BDV", vmp: 45.6, imp: 13.38, pmax: 610, voc: 55.31, isc: 14.03, tempCoeffVoc: -0.25, tempCoeffIsc: 0.046 },
-      { manufacturer: "ジンコ・ソーラージャパン", model: "JKM585N-72HL4-V-J", vmp: 43.48, imp: 13.44, pmax: 585, voc: 52.47, isc: 14.07, tempCoeffVoc: -0.24, tempCoeffIsc: 0.046 },
-      { manufacturer: "ジンコ・ソーラージャパン", model: "JKM625N-78HL4-BDV-J", vmp: 47.54, imp: 13.15, pmax: 625, voc: 56.95, isc: 13.8, tempCoeffVoc: -0.25, tempCoeffIsc: 0.045 },
-      { manufacturer: "ジンコ・ソーラージャパン", model: "JKM585N-72HL4-BDV-J", vmp: 44.02, imp: 13.29, pmax: 585, voc: 52.7, isc: 14.01, tempCoeffVoc: -0.25, tempCoeffIsc: 0.045 },
-      { manufacturer: "ジンコ・ソーラージャパン", model: "JKM590N-72HL4-BDV-J", vmp: 44.17, imp: 13.36, pmax: 590, voc: 52.9, isc: 14.07, tempCoeffVoc: -0.29, tempCoeffIsc: 0.8 },
-      { manufacturer: "ジンコ・ソーラージャパン", model: "JKM635N-78HL4-BDV-J", vmp: 47.86, imp: 13.27, pmax: 635, voc: 57.21, isc: 13.92, tempCoeffVoc: -0.29, tempCoeffIsc: "" },
-      { manufacturer: "ジンコ・ソーラージャパン", model: "JKM720N-66HL5-BDV", vmp: 40.89, imp: 17.61, pmax: 720, voc: 49.04, isc: 18.67, tempCoeffVoc: -0.29, tempCoeffIsc: "" },
-      { manufacturer: "トリナソーラージャパン", model: "TSM-590NEG19RC.20", vmp: 39.7, imp: 14.86, pmax: 590, voc: 47.8, isc: 15.72, tempCoeffVoc: -0.24, tempCoeffIsc: 0.04 },
-      { manufacturer: "トリナソーラージャパン", model: "TSM-595NEG19RC.20", vmp: 40, imp: 14.89, pmax: 595, voc: 48.1, isc: 15.76, tempCoeffVoc: -0.24, tempCoeffIsc: 0.04 },
-      { manufacturer: "トリナソーラージャパン", model: "TSM-600NEG19RC.20", vmp: 40.3, imp: 14.91, pmax: 600, voc: 48.4, isc: 15.8, tempCoeffVoc: -0.24, tempCoeffIsc: 0.04 },
-      { manufacturer: "トリナソーラージャパン", model: "TSM-605NEG19RC.20", vmp: 40.5, imp: 14.94, pmax: 605, voc: 48.7, isc: 15.73, tempCoeffVoc: -0.24, tempCoeffIsc: 0.04 },
-      { manufacturer: "トリナソーラージャパン", model: "TSM-610NEG19RC.20", vmp: 40.8, imp: 14.96, pmax: 610, voc: 49, isc: 15.86, tempCoeffVoc: -0.24, tempCoeffIsc: 0.04 },
-      { manufacturer: "トリナソーラージャパン", model: "TSM-615NEG19RC.20", vmp: 41.1, imp: 14.98, pmax: 615, voc: 49.3, isc: 15.89, tempCoeffVoc: -0.24, tempCoeffIsc: 0.04 },
-      { manufacturer: "トリナソーラージャパン", model: "TSM-620NEG19RC.20", vmp: 41.4, imp: 14.99, pmax: 620, voc: 49.6, isc: 15.91, tempCoeffVoc: -0.24, tempCoeffIsc: 0.04 },
-      { manufacturer: "トリナソーラージャパン", model: "TSM-700NEG21C.20", vmp: 40.5, imp: 17.29, pmax: 700, voc: 48.6, isc: 18.32, tempCoeffVoc: -0.29, tempCoeffIsc: 0.04 },
-      { manufacturer: "ネクストエナジー", model: "NER156M590B-MDD", vmp: 44.8, imp: 13.17, pmax: 590, voc: 53.3, isc: 13.93, tempCoeffVoc: -0.275, tempCoeffIsc: 0.045 },
-      { manufacturer: "ネクストエナジー", model: "NER108M435E-ND", vmp: 32.99, imp: 13.18, pmax: 435, voc: 39.26, isc: 13.97, tempCoeffVoc: -0.25, tempCoeffIsc: 0.043 },
-      { manufacturer: "JA Solar", model: "JAM66D46-720", vmp: 41.19, imp: 17.48, pmax: 720, voc: 49, isc: 18.59, tempCoeffVoc: -0.25, tempCoeffIsc: 0.04 }
+      { manufacturer: "Aiko Energy Japan", model: "AIKO-G640-MCH72Dｗ", vmp: 45.11, imp: 14.19, pmax: 640, voc: 54.3, isc: 14.96, tempCoeffVoc: -0.26, tempCoeffIsc: 0.05, tempCoeffPmax: -0.26 },
+      { manufacturer: "Aiko Energy Japan", model: "AIKO-A615-MAH72Mw", vmp: 45.51, imp: 13.51, pmax: 615, voc: 53.7, isc: 14.09, tempCoeffVoc: -0.24, tempCoeffIsc: 0.05, tempCoeffPmax: -0.26 },
+      { manufacturer: "Chint New Energy", model: "CHSM78N(DG)/F-BH635", vmp: 46.62, imp: 13.62, pmax: 635, voc: 56.41, isc: 14.27, tempCoeffVoc: -0.29, tempCoeffIsc: "", tempCoeffPmax: -0.29 },
+      { manufacturer: "Chint New Energy", model: "CHSM78N(DG)/F-BH650", vmp: 47.12, imp: 13.8, pmax: 650, voc: 57.01, isc: 14.51, tempCoeffVoc: -0.29, tempCoeffIsc: 0.36, tempCoeffPmax: -0.29 },
+      { manufacturer: "CHINT NEW ENERGY JAPAN", model: "CHSM72N(DG)/ FB-575", vmp: 42.94, imp: 13.39, pmax: 575, voc: 51.1, isc: 14.19, tempCoeffVoc: -0.25, tempCoeffIsc: 0.043, tempCoeffPmax: -0.29 },
+      { manufacturer: "CHINT NEW ENERGY JAPAN", model: "CHSM72N(DG)/ FB-580", vmp: 43.11, imp: 13.45, pmax: 580, voc: 51.3, isc: 14.28, tempCoeffVoc: -0.25, tempCoeffIsc: 0.043, tempCoeffPmax: -0.29 },
+      { manufacturer: "CHINT NEW ENERGY JAPAN", model: "CHSM72N(DG)/ FB-585", vmp: 43.27, imp: 13.52, pmax: 585, voc: 51.5, isc: 14.36, tempCoeffVoc: -0.25, tempCoeffIsc: 0.043, tempCoeffPmax: -0.29 },
+      { manufacturer: "CHINT NEW ENERGY JAPAN", model: "CHSM72N(DG)/ FB-590", vmp: 43.45, imp: 13.58, pmax: 590, voc: 51.7, isc: 14.45, tempCoeffVoc: -0.25, tempCoeffIsc: 0.043, tempCoeffPmax: -0.29 },
+      { manufacturer: "CHINT NEW ENERGY JAPAN", model: "CHSM72M(DG)/FB595", vmp: 43.61, imp: 13.64, pmax: 595, voc: 51.9, isc: 14.53, tempCoeffVoc: -0.25, tempCoeffIsc: 0.043, tempCoeffPmax: -0.34 },
+      { manufacturer: "CHINT NEW ENERGY JAPAN", model: "CHSM72M(DG)/FB600", vmp: 43.78, imp: 13.7, pmax: 600, voc: 52.1, isc: 14.61, tempCoeffVoc: -0.25, tempCoeffIsc: 0.043, tempCoeffPmax: -0.34 },
+      { manufacturer: "CHINT NEW ENERGY JAPAN", model: "CHSM72M(DG)/FB605", vmp: 43.95, imp: 13.77, pmax: 605, voc: 52.3, isc: 14.7, tempCoeffVoc: -0.25, tempCoeffIsc: 0.043, tempCoeffPmax: -0.34 },
+      { manufacturer: "CHINT NEW ENERGY JAPAN", model: "CHSM72M(DG)/FB610", vmp: 44.12, imp: 13.83, pmax: 610, voc: 52.5, isc: 14.78, tempCoeffVoc: -0.25, tempCoeffIsc: 0.043, tempCoeffPmax: -0.34 },
+      { manufacturer: "JASOLAR", model: "JAM66D46710/LB", vmp: 48.6, imp: 17.4, pmax: 710, voc: 48.6, isc: 18.51, tempCoeffVoc: -0.29, tempCoeffIsc: 0.045, tempCoeffPmax: -0.30 },
+      { manufacturer: "Leapton Energy", model: "LP182*182-M-78-MH-600W", vmp: 45.2, imp: 13.27, pmax: 600, voc: 54.1, isc: 14.08, tempCoeffVoc: -0.28, tempCoeffIsc: 0.36, tempCoeffPmax: -0.35 },
+      { manufacturer: "Leapton Energy", model: "LP182*182-M-78-NB-620W", vmp: 45.76, imp: 13.55, pmax: 620, voc: 55.61, isc: 14.09, tempCoeffVoc: -0.3, tempCoeffIsc: 0.046, tempCoeffPmax: -0.30 },
+      { manufacturer: "LONGi Solar Technology", model: "LR7-72HGD-615M", vmp: 44.22, imp: 13.91, pmax: 615, voc: 52.66, isc: 14.77, tempCoeffVoc: -0.28, tempCoeffIsc: 0.045, tempCoeffPmax: -0.28 },
+      { manufacturer: "LONGi Solar Technology", model: "LR7-72HGD-610M", vmp: 44.11, imp: 13.83, pmax: 610, voc: 52.55, isc: 14.69, tempCoeffVoc: -0.28, tempCoeffIsc: 0.045, tempCoeffPmax: -0.28 },
+      { manufacturer: "LONGi Solar Technology", model: "LR5-72HGD-590M", vmp: 43.44, imp: 13.59, pmax: 590, voc: 51.63, isc: 14.38, tempCoeffVoc: -0.28, tempCoeffIsc: 0.045, tempCoeffPmax: -0.35 },
+      { manufacturer: "LONGi Solar Technology", model: "LR-7-72HYD-660M", vmp: 44.85, imp: 14.72, pmax: 660, voc: 54, isc: 15.41, tempCoeffVoc: -0.26, tempCoeffIsc: "", tempCoeffPmax: -0.28 },
+      { manufacturer: "XSOL", model: "XLN108-460S", vmp: 33.17, imp: 13.87, pmax: 460, voc: 39.7, isc: 14.64, tempCoeffVoc: -0.29, tempCoeffIsc: 0.045, tempCoeffPmax: -0.30 },
+      { manufacturer: "カナディアンソーラージャパン", model: "CS6W-580TB-AG", vmp: 43.1, imp: 13.46, pmax: 580, voc: 52.2, isc: 13.93, tempCoeffVoc: -0.25, tempCoeffIsc: 0.05, tempCoeffPmax: -0.29 },
+      { manufacturer: "カナディアンソーラージャパン", model: "CS6W-560TB-AG", vmp: 42.3, imp: 13.24, pmax: 560, voc: 51.4, isc: 13.69, tempCoeffVoc: -0.25, tempCoeffIsc: 0.05, tempCoeffPmax: -0.29 },
+      { manufacturer: "カナディアンソーラージャパン", model: "CS6W-565TB-AG", vmp: 42.5, imp: 13.3, pmax: 565, voc: 51.6, isc: 13.3, tempCoeffVoc: 0.25, tempCoeffIsc: 0.05, tempCoeffPmax: -0.29 },
+      { manufacturer: "カナディアンソーラージャパン", model: "CS6W-575TB-AG", vmp: 42.9, imp: 13.41, pmax: 575, voc: 52, isc: 13.88, tempCoeffVoc: -0.25, tempCoeffIsc: 0.05, tempCoeffPmax: -0.29 },
+      { manufacturer: "カナディアンソーラージャパン", model: "CS6R-440T", vmp: 32.4, imp: 13.59, pmax: 440, voc: 39.4, isc: 14.01, tempCoeffVoc: -0.25, tempCoeffIsc: 0.05, tempCoeffPmax: -0.29 },
+      { manufacturer: "カナディアンソーラージャパン", model: "CS6W-570TB-AG", vmp: 42.7, imp: 13.35, pmax: 570, voc: 51.8, isc: 13.81, tempCoeffVoc: -0.25, tempCoeffIsc: 0.05, tempCoeffPmax: -0.29 },
+      { manufacturer: "カナディアンソーラージャパン", model: "CS6W-585T", vmp: 43.3, imp: 13.52, pmax: 585, voc: 52.4, isc: 14, tempCoeffVoc: -0.29, tempCoeffIsc: "", tempCoeffPmax: -0.29 },
+      { manufacturer: "カナディアンソーラージャパン", model: "CS6W-585T (AG)", vmp: 43.3, imp: 13.52, pmax: 585, voc: 52.4, isc: 14, tempCoeffVoc: -0.25, tempCoeffIsc: 0.05, tempCoeffPmax: -0.29 },
+      { manufacturer: "カナディアンソーラージャパン", model: "CS6R-415MS", vmp: 31.4, imp: 13.23, pmax: 415, voc: 37.4, isc: 14.09, tempCoeffVoc: -0.26, tempCoeffIsc: 0.05, tempCoeffPmax: -0.34 },
+      { manufacturer: "カナディアンソーラージャパン", model: "CS6.1-72TB-610", vmp: 44.4, imp: 13.74, pmax: 610, voc: 52.2, isc: 14.66, tempCoeffVoc: -0.29, tempCoeffIsc: 0.05, tempCoeffPmax: -0.29 },
+      { manufacturer: "カナディアンソーラージャパン", model: "CS6W-585TB-AG", vmp: 43.3, imp: 13.52, pmax: 585, voc: 52.4, isc: 14, tempCoeffVoc: -0.29, tempCoeffIsc: 0.05, tempCoeffPmax: -0.29 },
+      { manufacturer: "カナディアンソーラージャパン", model: "CS6W-590TB-AG", vmp: 43.5, imp: 13.57, pmax: 590, voc: 52.6, isc: 14.06, tempCoeffVoc: -0.29, tempCoeffIsc: 0.05, tempCoeffPmax: -0.29 },
+      { manufacturer: "カナディアンソーラージャパン", model: "CS6W-595TB-AG", vmp: 43.7, imp: 13.62, pmax: 595, voc: 52.8, isc: 14.12, tempCoeffVoc: -0.29, tempCoeffIsc: 0.05, tempCoeffPmax: -0.29 },
+      { manufacturer: "サンテック", model: "STP585S-C72/Nsh+", vmp: 42.79, imp: 13.67, pmax: 585, voc: 51.55, isc: 14.4, tempCoeffVoc: -0.25, tempCoeffIsc: 0.046, tempCoeffPmax: -0.30 },
+      { manufacturer: "サンテックエナジー", model: "STP555S-C72", vmp: 42.24, imp: 13.14, pmax: 555, voc: 50.07, isc: 14.07, tempCoeffVoc: -0.26, tempCoeffIsc: 0.05, tempCoeffPmax: -0.34 },
+      { manufacturer: "ジンコ・ソーラージャパン", model: "JKM580N-72HL4-BDV-J", vmp: 43.88, imp: 13.22, pmax: 580, voc: 52.5, isc: 13.95, tempCoeffVoc: -0.25, tempCoeffIsc: 0.046, tempCoeffPmax: -0.29 },
+      { manufacturer: "ジンコ・ソーラージャパン", model: "JKM550N-72HL4-BDV", vmp: 41.58, imp: 13.23, pmax: 550, voc: 50.27, isc: 14.01, tempCoeffVoc: -0.25, tempCoeffIsc: 0.046, tempCoeffPmax: -0.29 },
+      { manufacturer: "ジンコ・ソーラージャパン", model: "JKM555N-72HL4-BDV", vmp: 41.77, imp: 13.29, pmax: 555, voc: 50.47, isc: 14.07, tempCoeffVoc: -0.25, tempCoeffIsc: 0.046, tempCoeffPmax: -0.29 },
+      { manufacturer: "ジンコ・ソーラージャパン", model: "JKM560N-72HL4-BDV", vmp: 41.95, imp: 13.35, pmax: 560, voc: 50.67, isc: 14.13, tempCoeffVoc: -0.25, tempCoeffIsc: 0.046, tempCoeffPmax: -0.29 },
+      { manufacturer: "ジンコ・ソーラージャパン", model: "JKM565N-72HL4-BDV", vmp: 42.14, imp: 13.41, pmax: 565, voc: 50.87, isc: 14.19, tempCoeffVoc: -0.25, tempCoeffIsc: 0.046, tempCoeffPmax: -0.29 },
+      { manufacturer: "ジンコ・ソーラージャパン", model: "JKM570N-72HL4-BDV", vmp: 42.29, imp: 13.48, pmax: 570, voc: 51.07, isc: 14.25, tempCoeffVoc: -0.25, tempCoeffIsc: 0.046, tempCoeffPmax: -0.29 },
+      { manufacturer: "ジンコ・ソーラージャパン", model: "JKM590N-78HL4-BDV", vmp: 44.91, imp: 13.14, pmax: 590, voc: 54.76, isc: 13.71, tempCoeffVoc: -0.25, tempCoeffIsc: 0.046, tempCoeffPmax: -0.29 },
+      { manufacturer: "ジンコ・ソーラージャパン", model: "JKM595N-78HL4-BDV", vmp: 45.08, imp: 13.2, pmax: 595, voc: 54.9, isc: 13.79, tempCoeffVoc: -0.25, tempCoeffIsc: 0.046, tempCoeffPmax: -0.29 },
+      { manufacturer: "ジンコ・ソーラージャパン", model: "JKM600N-78HL4-BDV", vmp: 45.25, imp: 13.26, pmax: 600, voc: 55.03, isc: 13.87, tempCoeffVoc: -0.25, tempCoeffIsc: 0.046, tempCoeffPmax: -0.29 },
+      { manufacturer: "ジンコ・ソーラージャパン", model: "JKM605N-78HL4-BDV", vmp: 45.42, imp: 13.32, pmax: 605, voc: 55.17, isc: 13.95, tempCoeffVoc: -0.25, tempCoeffIsc: 0.046, tempCoeffPmax: -0.29 },
+      { manufacturer: "ジンコ・ソーラージャパン", model: "JKM610N-78HL4-BDV", vmp: 45.6, imp: 13.38, pmax: 610, voc: 55.31, isc: 14.03, tempCoeffVoc: -0.25, tempCoeffIsc: 0.046, tempCoeffPmax: -0.29 },
+      { manufacturer: "ジンコ・ソーラージャパン", model: "JKM585N-72HL4-V-J", vmp: 43.48, imp: 13.44, pmax: 585, voc: 52.47, isc: 14.07, tempCoeffVoc: -0.24, tempCoeffIsc: 0.046, tempCoeffPmax: -0.29 },
+      { manufacturer: "ジンコ・ソーラージャパン", model: "JKM625N-78HL4-BDV-J", vmp: 47.54, imp: 13.15, pmax: 625, voc: 56.95, isc: 13.8, tempCoeffVoc: -0.25, tempCoeffIsc: 0.045, tempCoeffPmax: -0.29 },
+      { manufacturer: "ジンコ・ソーラージャパン", model: "JKM585N-72HL4-BDV-J", vmp: 44.02, imp: 13.29, pmax: 585, voc: 52.7, isc: 14.01, tempCoeffVoc: -0.25, tempCoeffIsc: 0.045, tempCoeffPmax: -0.29 },
+      { manufacturer: "ジンコ・ソーラージャパン", model: "JKM590N-72HL4-BDV-J", vmp: 44.17, imp: 13.36, pmax: 590, voc: 52.9, isc: 14.07, tempCoeffVoc: -0.29, tempCoeffIsc: 0.8, tempCoeffPmax: -0.29 },
+      { manufacturer: "ジンコ・ソーラージャパン", model: "JKM635N-78HL4-BDV-J", vmp: 47.86, imp: 13.27, pmax: 635, voc: 57.21, isc: 13.92, tempCoeffVoc: -0.29, tempCoeffIsc: "", tempCoeffPmax: -0.29 },
+      { manufacturer: "ジンコ・ソーラージャパン", model: "JKM720N-66HL5-BDV", vmp: 40.89, imp: 17.61, pmax: 720, voc: 49.04, isc: 18.67, tempCoeffVoc: -0.29, tempCoeffIsc: "", tempCoeffPmax: -0.29 },
+      { manufacturer: "トリナソーラージャパン", model: "TSM-590NEG19RC.20", vmp: 39.7, imp: 14.86, pmax: 590, voc: 47.8, isc: 15.72, tempCoeffVoc: -0.24, tempCoeffIsc: 0.04, tempCoeffPmax: -0.30 },
+      { manufacturer: "トリナソーラージャパン", model: "TSM-595NEG19RC.20", vmp: 40, imp: 14.89, pmax: 595, voc: 48.1, isc: 15.76, tempCoeffVoc: -0.24, tempCoeffIsc: 0.04, tempCoeffPmax: -0.30 },
+      { manufacturer: "トリナソーラージャパン", model: "TSM-600NEG19RC.20", vmp: 40.3, imp: 14.91, pmax: 600, voc: 48.4, isc: 15.8, tempCoeffVoc: -0.24, tempCoeffIsc: 0.04, tempCoeffPmax: -0.30 },
+      { manufacturer: "トリナソーラージャパン", model: "TSM-605NEG19RC.20", vmp: 40.5, imp: 14.94, pmax: 605, voc: 48.7, isc: 15.73, tempCoeffVoc: -0.24, tempCoeffIsc: 0.04, tempCoeffPmax: -0.30 },
+      { manufacturer: "トリナソーラージャパン", model: "TSM-610NEG19RC.20", vmp: 40.8, imp: 14.96, pmax: 610, voc: 49, isc: 15.86, tempCoeffVoc: -0.24, tempCoeffIsc: 0.04, tempCoeffPmax: -0.30 },
+      { manufacturer: "トリナソーラージャパン", model: "TSM-615NEG19RC.20", vmp: 41.1, imp: 14.98, pmax: 615, voc: 49.3, isc: 15.89, tempCoeffVoc: -0.24, tempCoeffIsc: 0.04, tempCoeffPmax: -0.30 },
+      { manufacturer: "トリナソーラージャパン", model: "TSM-620NEG19RC.20", vmp: 41.4, imp: 14.99, pmax: 620, voc: 49.6, isc: 15.91, tempCoeffVoc: -0.24, tempCoeffIsc: 0.04, tempCoeffPmax: -0.30 },
+      { manufacturer: "トリナソーラージャパン", model: "TSM-700NEG21C.20", vmp: 40.5, imp: 17.29, pmax: 700, voc: 48.6, isc: 18.32, tempCoeffVoc: -0.29, tempCoeffIsc: 0.04, tempCoeffPmax: -0.30 },
+      { manufacturer: "ネクストエナジー", model: "NER156M590B-MDD", vmp: 44.8, imp: 13.17, pmax: 590, voc: 53.3, isc: 13.93, tempCoeffVoc: -0.275, tempCoeffIsc: 0.045, tempCoeffPmax: -0.34 },
+      { manufacturer: "ネクストエナジー", model: "NER108M435E-ND", vmp: 32.99, imp: 13.18, pmax: 435, voc: 39.26, isc: 13.97, tempCoeffVoc: -0.25, tempCoeffIsc: 0.043, tempCoeffPmax: -0.30 },
+      { manufacturer: "JA Solar", model: "JAM66D46-720", vmp: 41.19, imp: 17.48, pmax: 720, voc: 49, isc: 18.59, tempCoeffVoc: -0.25, tempCoeffIsc: 0.04, tempCoeffPmax: -0.30 }
     ];
 
     // ==========================================
@@ -310,7 +310,7 @@
       return warnings;
     }
 
-    function calculateDesign(_panel, _pcsList, _condition) {
+    function calculateDesign(_panel, _pcsList, _condition, _spotCondition) {
       // --- Data Sanitization: Ensure all numbers are actually numbers ---
       const panel = {
         ..._panel,
@@ -322,6 +322,7 @@
         moduleCount: Number(_panel.moduleCount) || 0,
         tempCoeffVoc: Number(_panel.tempCoeffVoc) || 0,
         tempCoeffIsc: Number(_panel.tempCoeffIsc) || 0,
+        tempCoeffPmax: Number(_panel.tempCoeffPmax) || -0.35, // Default if missing
       };
       
       const condition = {
@@ -330,6 +331,39 @@
         targetOverloadRatio: Number(_condition.targetOverloadRatio) || 0,
         manualSeriesCount: Number(_condition.manualSeriesCount) || 0,
       };
+
+      // Spot Check Conditions (Default to STC if missing)
+      const spotT = _spotCondition ? (Number(_spotCondition.simulationTemp) || 25) : 25;
+      const spotG = _spotCondition ? (Number(_spotCondition.simulationIrradiance) || 1000) : 1000;
+
+      // --- Spot Calculation Logic ---
+      // Coefficients (/100)
+      const alpha = (panel.tempCoeffIsc || 0.05) / 100;
+      const beta = (panel.tempCoeffVoc || -0.29) / 100; // Use Voc coeff for Vmp
+      const gamma = (panel.tempCoeffPmax || -0.35) / 100;
+
+      const deltaT_Spot = spotT - 25;
+      const G_Ratio = spotG / 1000;
+
+      // 1. Voltage (Spot Temp)
+      const vmpSpotUnit = panel.vmp * (1 + beta * deltaT_Spot);
+      const vocSpotUnit = panel.voc * (1 + beta * deltaT_Spot); // For reference
+
+      // 2. Current & Power (Spot Temp & Irradiance)
+      // Isc(T, G)
+      const iscSpotUnit = panel.isc * (1 + alpha * deltaT_Spot) * G_Ratio;
+      
+      // Pmax(T, G)
+      const pmaxSpotUnit = panel.pmax * (1 + gamma * deltaT_Spot) * G_Ratio;
+      
+      // Imp(T, G) = Pmax(T, G) / Vmp(T)
+      const impSpotUnit = vmpSpotUnit > 0 ? pmaxSpotUnit / vmpSpotUnit : 0;
+      
+      // Calculate Imp Ratio (compared to STC)
+      // This is helpful for debugging or advanced analysis
+      const impRatio = panel.imp > 0 ? (impSpotUnit / panel.imp) * 100 : 0;
+
+      // ------------------------------------------------------------
 
       const pcsList = _pcsList.map(pcs => ({
         ...pcs,
@@ -346,13 +380,14 @@
         maxIscTotal: Number(pcs.maxIscTotal) || 0,
         efficiency: Number(pcs.efficiency) || 0,
       }));
-      // ------------------------------------------------------------
-
+      
+      // Design Constraint: Voc at Min Temp (Worst Case for Safety)
       const vocColdModule = calculateVocCold(panel, condition.minTemperature);
       
       if (pcsList.length === 0) return createEmptyResult();
 
       const representativePcs = pcsList[0];
+      // Series count range is determined by SAFETY constraints (Min Temp Voc), not spot conditions
       const range = calculateAllowedSeriesRange(panel, representativePcs, vocColdModule);
       
       const globalWarnings = [];
@@ -373,8 +408,10 @@
 
       const stringDesign = {
         seriesModules: seriesCount,
-        vmpString: panel.vmp * seriesCount,
-        vocStringCold: vocColdModule * seriesCount
+        // These values now reflect the SPOT CONDITION for display/checking
+        vmpString: vmpSpotUnit * seriesCount,
+        vocStringCold: vocColdModule * seriesCount, // Keep Cold Voc for safety check
+        vocStringSpot: vocSpotUnit * seriesCount // Add Spot Voc for reference
       };
 
       // 割り当てロジック (Round-Robin)
@@ -420,9 +457,19 @@
         let usedCircuits = 0;
         let pcsWarnings = [];
         
-        // 電圧チェックを追加
+        // 電圧チェック (SAFETY: Cold Voc, SPOT: Spot Vmp)
         if (seriesCount > 0) {
-            pcsWarnings = [...pcsWarnings, ...checkVoltageConstraints(pcs, stringDesign.vmpString, stringDesign.vocStringCold)];
+            // Check 1: Safety (Max Input Voltage vs Cold Voc)
+            if (stringDesign.vocStringCold > pcs.maxInputVoltage) {
+                pcsWarnings.push(`警告: 低温時開放電圧(${stringDesign.vocStringCold.toFixed(1)}V)が最大入力(${pcs.maxInputVoltage}V)超過`);
+            }
+            // Check 2: Performance (MPPT Range vs Spot Vmp)
+            if (stringDesign.vmpString < pcs.mpptMinVoltage) {
+                pcsWarnings.push(`警告: 動作電圧(${stringDesign.vmpString.toFixed(1)}V @${spotT}℃)がMPPT下限(${pcs.mpptMinVoltage}V)未満`);
+            }
+            if (stringDesign.vmpString > pcs.mpptMaxVoltage) {
+                pcsWarnings.push(`警告: 動作電圧(${stringDesign.vmpString.toFixed(1)}V @${spotT}℃)がMPPT上限(${pcs.mpptMaxVoltage}V)超過`);
+            }
         }
 
         const circuitsPerMppt = Math.floor(pcs.totalCircuits / pcs.mpptCount);
@@ -443,8 +490,9 @@
             circuitIndex: i,
             mpptGroupIndex: mpptGroupIndex,
             stringDesign: assignedString,
-            currentImp: assignedString ? panel.imp : 0,
-            currentIsc: assignedString ? panel.isc : 0
+            // Use Spot values for current
+            currentImp: assignedString ? impSpotUnit : 0,
+            currentIsc: assignedString ? iscSpotUnit : 0
           };
           
           assignments.push(assignmentData);
@@ -453,15 +501,15 @@
           }
         }
 
-        // MPPT単位の電流チェック
+        // MPPT単位の電流チェック (Using Spot Current)
         const mpptCounts = {};
         pcsAssignments.forEach(a => {
             mpptCounts[a.mpptGroupIndex] = (mpptCounts[a.mpptGroupIndex] || 0) + 1;
         });
         
         for (const [mpptIdx, count] of Object.entries(mpptCounts)) {
-            const totalImp = count * panel.imp;
-            const totalIsc = count * panel.isc;
+            const totalImp = count * impSpotUnit;
+            const totalIsc = count * iscSpotUnit;
             if (totalImp > pcs.maxInputCurrentPerCircuit) {
                 pcsWarnings.push(`警告: MPPT${mpptIdx} 入力電流(${totalImp.toFixed(1)}A)が上限(${pcs.maxInputCurrentPerCircuit}A)を超過`);
             }
@@ -470,16 +518,18 @@
             }
         }
 
-        const pcsPvPower = modulesAssignedToPcs * panel.pmax;
-        totalPvCapacityW += pcsPvPower;
-        const overloadRatio = pcs.ratedPower > 0 ? (pcsPvPower / pcs.ratedPower) * 100 : 0;
+        // PV Power (Usage: STC Rating for Capacity/Overload)
+        const pcsPvPowerSTC = modulesAssignedToPcs * panel.pmax;
+        totalPvCapacityW += pcsPvPowerSTC;
+        const overloadRatioSTC = pcs.ratedPower > 0 ? (pcsPvPowerSTC / pcs.ratedPower) * 100 : 0;
 
-        const totalIsc = usedCircuits * panel.isc;
+        // Total Isc Check (Using Spot Isc for Safety)
+        const totalIsc = usedCircuits * iscSpotUnit;
         if (totalIsc > pcs.maxIscTotal) {
-          pcsWarnings.push(`警告: PCS合計短絡電流(${totalIsc.toFixed(1)}A)が最大値(${pcs.maxIscTotal}A)を超過`);
+          pcsWarnings.push(`警告: PCS合計短絡電流(${totalIsc.toFixed(1)}A)が最大値(${pcs.maxIscTotal}A)を超過 (詳細条件)`);
         }
-        if (overloadRatio < condition.targetOverloadRatio * 0.8 && pcs.ratedPower > 0) {
-            pcsWarnings.push(`情報: 過積載率(${overloadRatio.toFixed(1)}%)が目標(${condition.targetOverloadRatio}%)より大幅に低いです`);
+        if (overloadRatioSTC < condition.targetOverloadRatio * 0.8 && pcs.ratedPower > 0) {
+            pcsWarnings.push(`情報: 過積載率(${overloadRatioSTC.toFixed(1)}%)が目標(${condition.targetOverloadRatio}%)より大幅に低いです`);
         }
 
         // 重複警告の削除
@@ -489,9 +539,9 @@
           pcsId: pcs.id,
           totalModulesAssigned: modulesAssignedToPcs,
           usedCircuits,
-          overloadRatio,
+          overloadRatio: overloadRatioSTC,
           warnings: pcsWarnings,
-          pvCapacityKw: pcsPvPower / 1000,
+          pvCapacityKw: pcsPvPowerSTC / 1000,
           pcsCapacityKw: pcs.ratedPower / 1000
         });
         
@@ -745,6 +795,7 @@
           />
           <InputField label="温度係数 (Voc)" value={panel.tempCoeffVoc} onChange={(v) => onChange('tempCoeffVoc', v)} unit="%/℃" disabled={!isEditable} />
           <InputField label="温度係数 (Isc)" value={panel.tempCoeffIsc} onChange={(v) => onChange('tempCoeffIsc', v)} unit="%/℃" disabled={!isEditable} />
+          <InputField label="温度係数 (Pmax)" value={panel.tempCoeffPmax} onChange={(v) => onChange('tempCoeffPmax', v)} unit="%/℃" disabled={!isEditable} />
           
           {/* Save Button for Custom */}
           {isEditable && (
@@ -921,7 +972,7 @@
     };
 
     // --- DesignGuidePanel ---
-    const DesignGuidePanel = ({ panel, pcsList, condition }) => {
+    const DesignGuidePanel = ({ panel, pcsList, condition, spotCondition }) => {
       const pcs = pcsList[0];
       
       // 数値変換ヘルパー（安全対策）
@@ -936,40 +987,37 @@
 
       // Constants & Assumptions
       const T_cold = safeNum(condition.minTemperature);
-      const T_hot = 70; // 想定最高セル温度
-      const T_typ = 45; // 常用セル温度
+      const T_spot = safeNum(spotCondition.simulationTemp); // Use simulation temp instead of fixed hot/typ
       const SafetyMarginVoc = 0.95;
       
       // Coefficients
-      // β_Vmp ≒ α_Voc と仮定
       const alphaVoc = safeNum(panel.tempCoeffVoc) / 100;
       const betaVmp = alphaVoc; 
 
-      // 1. N_max: Voc Check (Cold)
+      // 1. N_max: Voc Check (Cold/Min Temp)
       const vocColdModule = vocVal * (1 + alphaVoc * (T_cold - 25));
       const pcsMaxInputVoltage = safeNum(pcs.maxInputVoltage);
       const nMaxRaw = pcsMaxInputVoltage / (vocColdModule || 1); // 0除算回避
       const nMax = Math.floor(nMaxRaw * SafetyMarginVoc);
 
-      // 2. N_min: Vmp Check (Hot)
+      // 2. N_min: Vmp Check (Spot Temp) -> Use Simulation Temp for analysis
       const vmpVal = safeNum(panel.vmp);
-      const vmpHotModule = vmpVal * (1 + betaVmp * (T_hot - 25));
+      // Use Voc coeff for Vmp as per calculation logic in calculateDesign
+      const vmpSpotModule = vmpVal * (1 + betaVmp * (T_spot - 25));
       const pcsMpptMinVoltage = safeNum(pcs.mpptMinVoltage);
-      // 実務的にはFull Power下限(例:580V)を見るが、データがないのでMPPT下限を使用しつつ注記
-      const nMinMppt = Math.ceil(pcsMpptMinVoltage / (vmpHotModule || 1));
+      const nMinMppt = Math.ceil(pcsMpptMinVoltage / (vmpSpotModule || 1));
       
-      // 3. Best Zone (Typical Temp vs Rated Voltage)
+      // 3. Best Zone (Spot Temp vs Rated Voltage)
       // 定格入力電圧 (なければ600Vと仮定)
       const vRated = safeNum(pcs.ratedInputVoltage) || 600; 
-      const vmpTypModule = vmpVal * (1 + betaVmp * (T_typ - 25));
       
       // ベストゾーン: 定格の 0.9 ~ 1.2倍
       const vBestMin = vRated * 0.9;
       const vBestMax = vRated * 1.2;
       
-      // この電圧範囲に入るN
-      const nBestMin = Math.ceil(vBestMin / (vmpTypModule || 1));
-      const nBestMax = Math.floor(vBestMax / (vmpTypModule || 1));
+      // この電圧範囲に入るN (Based on Spot Temp Vmp)
+      const nBestMin = Math.ceil(vBestMin / (vmpSpotModule || 1));
+      const nBestMax = Math.floor(vBestMax / (vmpSpotModule || 1));
       
       // 範囲オーバーラップチェック
       const nGuideMin = Math.max(nMinMppt, nBestMin);
@@ -977,16 +1025,30 @@
       const isFeasible = nGuideMin <= nGuideMax;
 
       // 4. Current Check (Imp & Isc)
-      const currentLimit = safeNum(pcs.maxInputCurrentPerCircuit); // MPPTあたりの最大入力電流と仮定
-      const iscLimit = safeNum(pcs.maxIscPerCircuit); // MPPTあたりの最大短絡電流
       
-      const impVal = safeNum(panel.imp);
-      const iscVal = safeNum(panel.isc);
+      // Calculate Spot Current using the SAME logic as calculateDesign
+      const spotG = safeNum(spotCondition.simulationIrradiance);
+      const G_Ratio = spotG / 1000;
+      const alphaIsc = (safeNum(panel.tempCoeffIsc) || 0.05) / 100;
+      const gammaPmax = (safeNum(panel.tempCoeffPmax) || -0.35) / 100;
+      const deltaT_Spot = T_spot - 25;
       
-      const imp1 = impVal;
-      const imp2 = impVal * 2;
-      const isc1 = iscVal;
-      const isc2 = iscVal * 2;
+      // Isc Spot
+      const iscSpot = panel.isc * (1 + alphaIsc * deltaT_Spot) * G_Ratio;
+      
+      // Imp Spot (Pmax/Vmp method)
+      // Re-calculate vmpSpotModule properly if needed or reuse vmpSpotModule above
+      // Note: vmpSpotModule above uses betaVmp which is alphaVoc. This is consistent with calculateDesign.
+      const pmaxSpot = panel.pmax * (1 + gammaPmax * deltaT_Spot) * G_Ratio;
+      const impSpot = vmpSpotModule > 0 ? pmaxSpot / vmpSpotModule : 0;
+
+      const currentLimit = safeNum(pcs.maxInputCurrentPerCircuit); 
+      const iscLimit = safeNum(pcs.maxIscPerCircuit); 
+      
+      const imp1 = impSpot;
+      const imp2 = impSpot * 2;
+      const isc1 = iscSpot;
+      const isc2 = iscSpot * 2;
       
       const isImp1Ok = imp1 <= currentLimit;
       const isImp2Ok = imp2 <= currentLimit;
@@ -1004,15 +1066,15 @@
           <div>
             <h4 className="text-sm font-bold text-slate-600 mb-3 flex items-center gap-2">
               <span className="w-1 h-4 bg-indigo-500 rounded-full"></span>
-              電圧設計 (Voltage Design)
+              電圧設計 (Voltage Design @ {T_spot}℃)
             </h4>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
                 {/* Column 1: 前提条件 */}
                 <div className="space-y-2">
                 <h4 className="font-bold text-slate-600 text-xs uppercase tracking-wider">計算前提</h4>
                 <ul className="list-disc list-inside text-slate-500 space-y-1 text-xs">
-                    <li>最低セル温度: <span className="font-bold text-slate-700">{T_cold}℃</span></li>
-                    <li>最高セル温度: <span className="font-bold text-slate-700">{T_hot}℃</span> (仮定)</li>
+                    <li>最低セル温度: <span className="font-bold text-slate-700">{T_cold}℃</span> (Voc基準)</li>
+                    <li>計算対象温度: <span className="font-bold text-slate-700">{T_spot}℃</span> (Vmp基準)</li>
                     <li>PCS定格電圧: <span className="font-bold text-slate-700">{vRated}V</span></li>
                 </ul>
                 </div>
@@ -1022,11 +1084,11 @@
                 <h4 className="font-bold text-slate-600 text-xs uppercase tracking-wider">直列数 制約範囲</h4>
                 <div className="bg-white p-3 rounded border border-slate-200 space-y-2">
                     <div className="flex justify-between items-center">
-                    <span className="text-slate-500 text-xs">Voc制約 (寒冷時)</span>
+                    <span className="text-slate-500 text-xs">Voc制約 (MinTemp)</span>
                     <span className="font-bold text-slate-800">{nMax} 枚以下</span>
                     </div>
                     <div className="flex justify-between items-center">
-                    <span className="text-slate-500 text-xs">Vmp制約 (高温時)</span>
+                    <span className="text-slate-500 text-xs">Vmp制約 ({T_spot}℃)</span>
                     <span className="font-bold text-slate-800">{nMinMppt} 枚以上</span>
                     </div>
                 </div>
@@ -1034,7 +1096,7 @@
 
                 {/* Column 3: ベストゾーン */}
                 <div className="space-y-2">
-                <h4 className="font-bold text-slate-600 text-xs uppercase tracking-wider">推奨ベストゾーン</h4>
+                <h4 className="font-bold text-slate-600 text-xs uppercase tracking-wider">推奨ベストゾーン (@{T_spot}℃)</h4>
                 <div className={`p-3 rounded border space-y-2 ${isFeasible ? "bg-emerald-50 border-emerald-200" : "bg-red-50 border-red-200"}`}>
                     <div className="text-center">
                     {isFeasible ? (
@@ -1046,7 +1108,7 @@
                     )}
                     </div>
                     <div className="text-xs text-center text-slate-500">
-                    目標Vmp: {(vmpTypModule * nGuideMin).toFixed(0)}V 〜 {(vmpTypModule * nGuideMax).toFixed(0)}V
+                    目標Vmp: {(vmpSpotModule * nGuideMin).toFixed(0)}V 〜 {(vmpSpotModule * nGuideMax).toFixed(0)}V
                     </div>
                 </div>
                 </div>
@@ -1057,14 +1119,14 @@
           <div className="pt-4 border-t border-slate-200">
             <h4 className="text-sm font-bold text-slate-600 mb-3 flex items-center gap-2">
               <span className="w-1 h-4 bg-orange-500 rounded-full"></span>
-              電流設計 (Current Design / MPPT)
+              電流設計 (Current Design / MPPT @ {T_spot}℃, {spotG}W/m²)
             </h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Spec Info */}
                 <div className="bg-white p-4 rounded border border-slate-200 text-xs">
                     <div className="flex justify-between items-center mb-2 pb-2 border-b border-slate-100">
-                        <span className="text-slate-500">パネル Imp / Isc</span>
-                        <span className="font-bold text-slate-700">{impVal.toFixed(2)} A / {iscVal.toFixed(2)} A</span>
+                        <span className="text-slate-500">予測 Imp / Isc</span>
+                        <span className="font-bold text-slate-700">{impSpot.toFixed(2)} A / {iscSpot.toFixed(2)} A</span>
                     </div>
                     <div className="flex justify-between items-center">
                         <span className="text-slate-500">PCS最大入力電流 (MPPT)</span>
@@ -1191,15 +1253,15 @@
                 <i className="fa-solid fa-bolt text-6xl"></i>
               </div>
               <div>
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">PV システム容量</p>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">PV システム容量 (DC)</p>
                 <div className="flex items-baseline gap-1">
                   <span className="text-3xl font-bold text-slate-800">{result.totalPvCapacityKw.toFixed(2)}</span>
                   <span className="text-sm font-medium text-slate-500">kW</span>
                 </div>
               </div>
               <div className="mt-4 pt-3 border-t border-slate-100 flex justify-between items-center text-xs">
-                <span className="text-slate-500">パネル総数</span>
-                <span className="font-bold text-slate-700">{panel.moduleCount} 枚</span>
+                <span className="text-slate-500">割付パネル総数</span>
+                <span className="font-bold text-slate-700">{result.summaries.reduce((acc, s) => acc + s.totalModulesAssigned, 0)} / {panel.moduleCount} 枚</span>
               </div>
             </div>
 
@@ -1233,7 +1295,7 @@
               <div>
                 <p className={`text-xs font-bold uppercase tracking-wider mb-1 ${
                     result.totalOverloadRatio > 150 ? "text-red-400" : "text-emerald-600"
-                }`}>全体過積載率</p>
+                }`}>全体過積載率 (STC)</p>
                 <div className="flex items-baseline gap-1">
                   <span className={`text-3xl font-bold ${
                       result.totalOverloadRatio > 150 ? "text-red-700" : "text-emerald-700"
@@ -1278,7 +1340,7 @@
                         </p>
                       </div>
                       <div className="space-y-1">
-                        <span className="text-xs text-slate-400">PV入力</span>
+                        <span className="text-xs text-slate-400">PV入力 (STC)</span>
                         <p className="font-bold text-slate-700">{summary.pvCapacityKw.toFixed(2)} <span className="text-xs font-normal">kW</span></p>
                       </div>
                       <div className="space-y-1">
@@ -1313,7 +1375,7 @@
     };
 
     // --- VoltagePatternsPanel ---
-    const VoltagePatternsPanel = ({ result, pcsList, panel }) => {
+    const VoltagePatternsPanel = ({ result, pcsList, panel, spotCondition }) => {
       const patterns = React.useMemo(() => {
         const map = new Map();
         result.assignments.forEach(a => {
@@ -1330,18 +1392,34 @@
       }, [result.assignments]);
 
       if (patterns.length === 0) return null;
+      
+      const spotT = Number(spotCondition?.simulationTemp) || 25;
 
       return (
         <section className="space-y-3">
            <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
              <i className="fa-solid fa-bolt"></i>
-             ストリング構成別 電圧詳細
+             ストリング構成別 電圧詳細 (@{spotT}℃)
            </h3>
            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
              {patterns.map(([seriesCount, data]) => {
-               const vmp = (panel.vmp * seriesCount);
-               const vmpStr = vmp.toFixed(1);
-               const vocCold = (data.assignments[0].stringDesign?.vocStringCold || 0);
+               // Calculate Vmp based on Spot Condition for EACH series count independently
+               // Logic: Vmp_Spot_Unit * SeriesCount
+               // We need to replicate the spot Vmp unit calculation here to ensure accuracy for any series count
+               
+               const beta = (Number(panel.tempCoeffVoc) || -0.29) / 100;
+               const deltaT_Spot = spotT - 25;
+               const vmpSpotUnit = panel.vmp * (1 + beta * deltaT_Spot);
+               
+               const vmpSpot = vmpSpotUnit * seriesCount;
+               const vmpStr = vmpSpot.toFixed(1);
+               
+               // Voc Cold is stored in stringDesign, but depends on series count.
+               // If assignment exists, we can take it from there (as calculateDesign puts it there).
+               // However, if we have mixed designs, taking from [0] is risky if they differ (though grouped by seriesCount).
+               // Grouping by seriesCount ensures all in 'data' have same series count.
+               // But vocStringCold in stringDesign is calculated based on that series count.
+               const vocCold = data.assignments[0].stringDesign?.vocStringCold || 0;
                const vocColdStr = vocCold.toFixed(1);
                
                // この構成を使用しているPCSを特定してチェック
@@ -1352,9 +1430,9 @@
                  const pcs = pcsList.find(p => p.id === pid);
                  if (!pcs) return;
                  
-                 if (vmp < pcs.mpptMinVoltage) {
+                 if (vmpSpot < pcs.mpptMinVoltage) {
                     errors.push({ pid, msg: `MPPT下限(${pcs.mpptMinVoltage}V)未満` });
-                 } else if (vmp > pcs.mpptMaxVoltage) {
+                 } else if (vmpSpot > pcs.mpptMaxVoltage) {
                     errors.push({ pid, msg: `MPPT上限(${pcs.mpptMaxVoltage}V)超過` });
                  }
                  
@@ -1410,6 +1488,116 @@
                );
              })}
            </div>
+        </section>
+      );
+    };
+
+    // --- SpotCheckAnalysis (New) ---
+    const SpotCheckAnalysis = ({ panel, condition }) => {
+      // 必須値のチェック
+      if (!panel.vmp || !panel.pmax || !condition.simulationTemp || !condition.simulationIrradiance) return null;
+
+      // 係数の取得 (入力は%なので /100 する)
+      // Pmax係数が未定義の場合は一般的な値(-0.35)を仮定するが、基本は入力値に従う
+      const alpha = (Number(panel.tempCoeffIsc) || 0.05) / 100; // Isc
+      const beta = (Number(panel.tempCoeffVoc) || -0.29) / 100; // Voc (Vmpの代用)
+      const gamma = (Number(panel.tempCoeffPmax) || -0.35) / 100; // Pmax
+
+      const T = Number(condition.simulationTemp);
+      const deltaT = T - 25;
+      const G = Number(condition.simulationIrradiance);
+      const Gratio = G / 1000;
+
+      // --- 1. 特定条件の電圧予測 (青い表: 温度影響のみ) ---
+      // V(T) = Vstc * [1 + beta * deltaT]
+      const vocT = panel.voc * (1 + beta * deltaT);
+      const vmpT = panel.vmp * (1 + beta * deltaT);
+      
+      // Pmax(T) = PmaxStc * [1 + gamma * deltaT]
+      const pmaxT_tempOnly = panel.pmax * (1 + gamma * deltaT);
+      const ratio = (pmaxT_tempOnly / panel.pmax) * 100;
+
+      // --- 2. 特定条件の電流予測 (緑のカード: 温度 + 日射) ---
+      // Isc(T, G) = IscStc * [1 + alpha * deltaT] * (G/1000)
+      const iscTG = panel.isc * (1 + alpha * deltaT) * Gratio;
+
+      // Imp(T, G) の逆算ロジック
+      // Step 1: Vmp(T) は上で計算済み (vmpT)
+      // Step 2: Pmax(T, G) を計算
+      const pmaxTG = panel.pmax * (1 + gamma * deltaT) * Gratio;
+      // Step 3: Imp = Pmax / Vmp
+      const impTG = vmpT > 0 ? pmaxTG / vmpT : 0;
+
+      // --- 3. 電圧許容範囲 (公差) ---
+      // 例: ±5% と仮定 (ユーザー入力がないため固定値または条件から取得したいが、一旦固定で表示)
+      const toleranceMin = 5; // 5%
+      const toleranceMax = 5; // 5%
+      const vMin = vmpT * (1 - toleranceMin / 100);
+      const vMax = vmpT * (1 + toleranceMax / 100);
+
+      return (
+        <section className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
+                <i className="fa-solid fa-microchip text-indigo-500"></i>
+                <h3 className="text-lg font-bold text-slate-700">詳細シミュレーション (Spot Check)</h3>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* 青い表: 電圧・出力予測 (温度依存) */}
+                <div className="bg-white rounded-xl shadow-sm border border-blue-200 overflow-hidden">
+                    <div className="bg-blue-50 px-4 py-2 border-b border-blue-100 flex justify-between items-center">
+                        <span className="font-bold text-blue-800 text-sm">電圧・出力予測 (温度: {T}℃)</span>
+                        <i className="fa-solid fa-temperature-half text-blue-400"></i>
+                    </div>
+                    <table className="w-full text-sm">
+                        <tbody>
+                            <tr className="border-b border-slate-100">
+                                <td className="px-4 py-2 text-slate-500 bg-slate-50/50 w-1/3">開放電圧 (Voc)</td>
+                                <td className="px-4 py-2 font-mono font-bold text-slate-700">{vocT.toFixed(2)} V</td>
+                            </tr>
+                            <tr className="border-b border-slate-100">
+                                <td className="px-4 py-2 text-slate-500 bg-slate-50/50">動作電圧 (Vmp)</td>
+                                <td className="px-4 py-2 font-mono font-bold text-slate-700">{vmpT.toFixed(2)} V</td>
+                            </tr>
+                            <tr className="border-b border-slate-100">
+                                <td className="px-4 py-2 text-slate-500 bg-slate-50/50">最大出力 (Pmax)</td>
+                                <td className="px-4 py-2 font-mono font-bold text-slate-700">{pmaxT_tempOnly.toFixed(1)} W</td>
+                            </tr>
+                            <tr>
+                                <td className="px-4 py-2 text-slate-500 bg-slate-50/50">対STC比率</td>
+                                <td className="px-4 py-2 font-mono font-bold text-blue-600">{ratio.toFixed(1)} %</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <div className="p-2 bg-blue-50/30 text-[10px] text-slate-500 text-center border-t border-blue-50">
+                        Vmin: {vMin.toFixed(1)}V (-{toleranceMin}%) 〜 Vmax: {vMax.toFixed(1)}V (+{toleranceMax}%)
+                    </div>
+                </div>
+
+                {/* 緑のカード: 電流予測 (温度+日射依存) */}
+                <div className="bg-white rounded-xl shadow-sm border border-emerald-200 overflow-hidden flex flex-col">
+                    <div className="bg-emerald-50 px-4 py-2 border-b border-emerald-100 flex justify-between items-center">
+                        <span className="font-bold text-emerald-800 text-sm">電流予測 (日射: {G}W/m²)</span>
+                        <i className="fa-solid fa-sun text-emerald-400"></i>
+                    </div>
+                    <div className="p-4 grid grid-cols-2 gap-4 flex-1 items-center">
+                        <div className="text-center space-y-1">
+                            <p className="text-xs text-slate-500 uppercase tracking-wider">短絡電流 (Isc)</p>
+                            <p className="text-2xl font-bold text-slate-700 font-mono">{iscTG.toFixed(2)} <span className="text-sm font-normal text-slate-400">A</span></p>
+                        </div>
+                        <div className="text-center space-y-1 border-l border-slate-100">
+                            <p className="text-xs text-slate-500 uppercase tracking-wider">動作電流 (Imp)</p>
+                            <p className="text-2xl font-bold text-emerald-600 font-mono">{impTG.toFixed(2)} <span className="text-sm font-normal text-emerald-400">A</span></p>
+                            <p className="text-[10px] text-slate-400">※Pmax/Vmpより逆算</p>
+                        </div>
+                    </div>
+                    <div className="bg-emerald-50/30 px-4 py-2 border-t border-emerald-50 text-xs text-center text-slate-500">
+                        <span className="font-bold">MPPT合計予測: </span> 
+                        Imp × 1 = <span className="font-bold text-slate-700">{impTG.toFixed(1)}A</span> / 
+                        Isc × 1 = <span className="font-bold text-slate-700">{iscTG.toFixed(1)}A</span>
+                    </div>
+                </div>
+            </div>
         </section>
       );
     };
@@ -1585,7 +1773,8 @@
                   <tr key={rowNum} className="hover:bg-slate-50 transition-colors">
                     <td className="px-2 py-2 font-mono font-medium text-center text-slate-500 bg-slate-50/50 border-b border-slate-100 text-xs">{String(rowNum).padStart(2, '0')}</td>
                     {pcsIds.map(pcsId => {
-                      const assignment = assignmentsByPcs[pcsId].find(a => a.circuitIndex === rowNum);
+                      const assignments = assignmentsByPcs[pcsId] || [];
+                      const assignment = assignments.find(a => a.circuitIndex === rowNum);
                       const modules = assignment?.stringDesign?.seriesModules || 0;
                       const isEmpty = modules === 0;
                       
@@ -1641,7 +1830,7 @@
     // ==========================================
     
     const INITIAL_PANEL = {
-      manufacturer: '', model: '', voc: '', vmp: '', isc: '', imp: '', pmax: '', tempCoeffVoc: '', tempCoeffIsc: '', moduleCount: ''
+      manufacturer: '', model: '', voc: '', vmp: '', isc: '', imp: '', pmax: '', tempCoeffVoc: '', tempCoeffIsc: '', tempCoeffPmax: '', moduleCount: ''
     };
     const INITIAL_PCS = {
       id: 'PCS1', manufacturer: '', model: '', ratedPower: '', totalCircuits: '', mpptCount: '', startupVoltage: '', mpptMinVoltage: '', mpptMaxVoltage: '', maxInputVoltage: '', maxInputCurrentPerCircuit: '', maxIscPerCircuit: '', maxIscTotal: '', efficiency: ''
@@ -1656,6 +1845,11 @@
       const [panelPresets, setPanelPresets] = useState([]);
       const [panel, setPanel] = useState(INITIAL_PANEL);
       
+      const [spotCondition, setSpotCondition] = useState({
+          simulationTemp: -10, // Default calculation temp
+          simulationIrradiance: 1000 // Default irradiance
+      });
+
       // Initialize presets from default + localStorage
       useEffect(() => {
         const stored = localStorage.getItem('customPanelPresets');
@@ -1677,7 +1871,8 @@
           isc: Number(panel.isc),
           imp: Number(panel.imp),
           tempCoeffVoc: Number(panel.tempCoeffVoc),
-          tempCoeffIsc: Number(panel.tempCoeffIsc)
+          tempCoeffIsc: Number(panel.tempCoeffIsc),
+          tempCoeffPmax: Number(panel.tempCoeffPmax)
         };
         
         // Save to localStorage
@@ -1706,14 +1901,16 @@
         if (modelName === 'CUSTOM') {
             setPanel(prev => ({
                 ...prev,
-                manufacturer: '', model: '', voc: '', vmp: '', isc: '', imp: '', pmax: '', tempCoeffVoc: '', tempCoeffIsc: ''
+                manufacturer: '', model: '', voc: '', vmp: '', isc: '', imp: '', pmax: '', tempCoeffVoc: '', tempCoeffIsc: '', tempCoeffPmax: ''
                 // keep moduleCount
             }));
         } else {
             // Search in panelPresets state instead of constant
             const preset = panelPresets.find(p => p.model === modelName);
             if (preset) {
-                setPanel(prev => ({ ...prev, ...preset }));
+                // If preset doesn't have tempCoeffPmax, use default
+                const pmaxCoeff = preset.tempCoeffPmax !== undefined ? preset.tempCoeffPmax : -0.35;
+                setPanel(prev => ({ ...prev, ...preset, tempCoeffPmax: pmaxCoeff }));
             }
         }
       }, [panelPresets]);
@@ -1723,12 +1920,38 @@
       const handleAddPcs = useCallback(() => setPcsList(prev => {
         const lastPcs = prev[prev.length - 1];
         const baseData = lastPcs ? { ...lastPcs } : { ...INITIAL_PCS };
-        return [...prev, { ...baseData, id: `PCS${prev.length + 1}` }];
+        
+        // Ensure Unique ID
+        let newNum = prev.length + 1;
+        const existingIds = new Set(prev.map(p => p.id));
+        // Fix infinite loop potential: limit iterations or ensure loop breaks
+        // Also, prev.length might be smaller if items were deleted, so newNum might already exist.
+        // Just find the smallest available number starting from 1
+        newNum = 1;
+        while (existingIds.has(`PCS${newNum}`)) {
+            newNum++;
+        }
+
+        return [...prev, { ...baseData, id: `PCS${newNum}` }];
       }), []);
 
       const handleRemovePcs = useCallback((id) => setPcsList(prev => prev.filter(pcs => pcs.id !== id)), []);
-      const handleConditionChange = useCallback((field, value) => setCondition(prev => ({ ...prev, [field]: value })), []);
       
+      // Unified Condition Handler
+      const handleUnifiedConditionChange = useCallback((field, value) => {
+          // Update both legacy 'condition' and new 'spotCondition' states to keep sync where needed
+          // Ideally, we should merge these states, but for now we sync them.
+          
+          if (field === 'simulationTemp') {
+             setSpotCondition(prev => ({ ...prev, simulationTemp: value }));
+             setCondition(prev => ({ ...prev, minTemperature: value })); // Sync minTemp with SimTemp
+          } else if (field === 'simulationIrradiance') {
+             setSpotCondition(prev => ({ ...prev, simulationIrradiance: value }));
+          } else {
+             setCondition(prev => ({ ...prev, [field]: value }));
+          }
+      }, []);
+
       // Preset selection handler
       const handlePcsPresetSelect = useCallback((id, modelName) => {
         if (modelName === 'CUSTOM') {
@@ -1760,7 +1983,7 @@
         setIsCalculating(true);
         setTimeout(() => {
           try {
-            const res = calculateDesign(panel, pcsList, condition);
+            const res = calculateDesign(panel, pcsList, condition, spotCondition);
             setResult(res);
             setManualAssignments(null);
           } catch (e) {
@@ -1822,6 +2045,25 @@
           const newSummaries = [];
           const globalWarnings = [];
 
+          // Spot Calculation logic for manual adjustments
+          // Coefficients
+          const alpha = (Number(panel.tempCoeffIsc) || 0.05) / 100;
+          const gamma = (Number(panel.tempCoeffPmax) || -0.35) / 100;
+          const spotT = Number(spotCondition.simulationTemp);
+          const spotG = Number(spotCondition.simulationIrradiance);
+          const deltaT_Spot = spotT - 25;
+          const G_Ratio = spotG / 1000;
+
+          // Pmax & Isc at Spot Condition
+          const pmaxSpotUnit = panel.pmax * (1 + gamma * deltaT_Spot) * G_Ratio;
+          const iscSpotUnit = panel.isc * (1 + alpha * deltaT_Spot) * G_Ratio;
+
+          // Imp at Spot Condition (approx logic for display)
+          // Need vmpSpot to calculate Imp
+          const beta = (Number(panel.tempCoeffVoc) || -0.29) / 100;
+          const vmpSpotUnit = panel.vmp * (1 + beta * deltaT_Spot);
+          const impSpotUnit = vmpSpotUnit > 0 ? pmaxSpotUnit / vmpSpotUnit : 0;
+
           for(const pcs of pcsList) {
               totalPcsCapacityW += pcs.ratedPower;
               const pcsAssignments = assignments.filter(a => a.pcsId === pcs.id);
@@ -1834,7 +2076,8 @@
 
               pcsAssignments.forEach(a => {
                   if(a.stringDesign && a.stringDesign.seriesModules > 0) {
-                      pcsModules += a.stringDesign.seriesModules;
+                      const sMod = a.stringDesign.seriesModules;
+                      pcsModules += sMod;
                       usedCircuits++;
                       
                       // MPPT集計
@@ -1847,46 +2090,50 @@
                   }
               });
               
-              // 電流チェック (MPPT単位)
+              // 電流チェック (MPPT単位) - USING SPOT VALUES
               for (const [mpptIdx, count] of Object.entries(mpptCounts)) {
-                  const totalImp = count * panel.imp;
-                  const totalIsc = count * panel.isc;
-                  // Note: maxInputCurrentPerCircuit is treated as Per MPPT limit here as per user context
+                  // Calculate total current based on SPOT CONDITION
+                  const totalImp = count * impSpotUnit;
+                  const totalIsc = count * iscSpotUnit;
+                  
                   if (totalImp > pcs.maxInputCurrentPerCircuit) {
-                      pcsWarnings.push(`警告: MPPT${mpptIdx} 入力電流(${totalImp.toFixed(1)}A)が上限(${pcs.maxInputCurrentPerCircuit}A)を超過`);
+                      pcsWarnings.push(`警告: MPPT${mpptIdx} 入力電流(${totalImp.toFixed(1)}A)が上限(${pcs.maxInputCurrentPerCircuit}A)を超過 (詳細条件)`);
                   }
                   if (totalIsc > pcs.maxIscPerCircuit) {
-                      pcsWarnings.push(`警告: MPPT${mpptIdx} 短絡電流(${totalIsc.toFixed(1)}A)が上限(${pcs.maxIscPerCircuit}A)を超過`);
+                      pcsWarnings.push(`警告: MPPT${mpptIdx} 短絡電流(${totalIsc.toFixed(1)}A)が上限(${pcs.maxIscPerCircuit}A)を超過 (詳細条件)`);
                   }
               }
 
               pcsWarnings = [...pcsWarnings, ...voltageWarnings];
 
-              const pcsPvPower = pcsModules * panel.pmax;
-              const overloadRatio = pcs.ratedPower > 0 ? (pcsPvPower / pcs.ratedPower) * 100 : 0;
-              totalModulesAssigned += pcsModules;
-              totalPvCapacityW += pcsPvPower;
+              // PV Power (Usage: STC Rating for Capacity/Overload, Spot for generation check if needed elsewhere)
+              // Revert Capacity/Overload calculation to STC basis for industry standard consistency
+              const pcsPvPowerSTC = pcsModules * panel.pmax;
+              const overloadRatioSTC = pcs.ratedPower > 0 ? (pcsPvPowerSTC / pcs.ratedPower) * 100 : 0;
               
-              // 合計短絡電流チェック
-              const totalIsc = usedCircuits * panel.isc;
+              totalModulesAssigned += pcsModules;
+              totalPvCapacityW += pcsPvPowerSTC;
+              
+              // 合計短絡電流チェック (USING SPOT ISC for Safety)
+              const totalIsc = usedCircuits * iscSpotUnit;
               if (totalIsc > pcs.maxIscTotal) {
-                  pcsWarnings.push(`警告: PCS合計短絡電流(${totalIsc.toFixed(1)}A)が最大値(${pcs.maxIscTotal}A)を超過`);
+                  pcsWarnings.push(`警告: PCS合計短絡電流(${totalIsc.toFixed(1)}A)が最大値(${pcs.maxIscTotal}A)を超過 (詳細条件)`);
               }
 
               const originalSummary = result.summaries.find(s => s.pcsId === pcs.id);
               
-              // 過積載率チェック
-              if (overloadRatio < condition.targetOverloadRatio * 0.8 && pcs.ratedPower > 0) {
-                  pcsWarnings.push(`情報: 過積載率(${overloadRatio.toFixed(1)}%)が目標(${condition.targetOverloadRatio}%)より大幅に低いです`);
+              // 過積載率チェック (STC based)
+              if (overloadRatioSTC < condition.targetOverloadRatio * 0.8 && pcs.ratedPower > 0) {
+                  pcsWarnings.push(`情報: 過積載率(${overloadRatioSTC.toFixed(1)}%)が目標(${condition.targetOverloadRatio}%)より大幅に低いです`);
               }
 
               newSummaries.push({
                   ...originalSummary,
                   totalModulesAssigned: pcsModules,
                   usedCircuits: usedCircuits,
-                  overloadRatio: overloadRatio,
+                  overloadRatio: overloadRatioSTC,
                   warnings: pcsWarnings,
-                  pvCapacityKw: pcsPvPower / 1000,
+                  pvCapacityKw: pcsPvPowerSTC / 1000,
               });
           }
 
@@ -1965,6 +2212,45 @@
                       onSaveCustom={handleSaveCustomPanel}
                   />
                   
+                  {/* 詳細シミュレーション条件入力 (Left Columnに追加) */}
+                  <section className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
+                    <h2 className="flex items-center gap-2 text-lg font-bold text-slate-800 mb-4 pb-2 border-b border-slate-100">
+                      <i className="fa-solid fa-microchip text-indigo-500 text-xl"></i>
+                      シミュレーション条件
+                    </h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                      <InputField 
+                        label="計算対象温度" 
+                        value={spotCondition.simulationTemp} 
+                        onChange={(v) => handleUnifiedConditionChange('simulationTemp', v)} 
+                        unit="℃" 
+                      />
+                      <InputField 
+                        label="日射強度" 
+                        value={spotCondition.simulationIrradiance} 
+                        onChange={(v) => handleUnifiedConditionChange('simulationIrradiance', v)} 
+                        unit="W/m²" 
+                      />
+                    </div>
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <InputField 
+                        label="目標過積載率" 
+                        value={condition.targetOverloadRatio} 
+                        onChange={(v) => handleUnifiedConditionChange('targetOverloadRatio', v)} 
+                        unit="%" 
+                      />
+                      <InputField 
+                        label="直列数 (任意指定)" 
+                        value={condition.manualSeriesCount} 
+                        onChange={(v) => handleUnifiedConditionChange('manualSeriesCount', v)} 
+                        unit="枚" 
+                        type="number" 
+                      />
+                    </div>
+                    <p className="text-xs text-slate-400 mt-2">※ 「計算対象温度」は寒冷時の電圧チェック(Min Temp)と詳細分析(Spot)の両方に使用されます</p>
+                    <p className="text-xs text-slate-400">※ 直列数を0にすると自動計算されます</p>
+                  </section>
+                  
                   {/* Simulation Button (Top) */}
                   <button
                     onClick={handleCalculate}
@@ -1985,7 +2271,8 @@
                     onChange={handlePcsChange} 
                     onPresetSelect={handlePcsPresetSelect}
                   />
-                  <ConditionForm condition={condition} onChange={handleConditionChange} />
+                  {/* Old ConditionForm Removed */}
+                  
                   <SystemOverview panel={panel} pcsList={pcsList} />
                   
                   <button
@@ -2027,7 +2314,7 @@
                   {finalResult ? (
                     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                       <SummaryPanel result={finalResult} panel={panel} pcsList={pcsList} />
-                      <VoltagePatternsPanel result={finalResult} pcsList={pcsList} panel={panel} />
+                      <VoltagePatternsPanel result={finalResult} pcsList={pcsList} panel={panel} spotCondition={spotCondition} />
                       <ResultTable result={finalResult} pcsList={pcsList} onAssignmentChange={handleAssignmentChange} />
                       <GlobalAlerts warnings={finalResult.globalWarnings} />
                     </div>
@@ -2042,7 +2329,7 @@
                   )}
                   
                   {/* Design Guide Panel (Always Visible) */}
-                  <DesignGuidePanel panel={panel} pcsList={pcsList} condition={condition} />
+                  <DesignGuidePanel panel={panel} pcsList={pcsList} condition={condition} spotCondition={spotCondition} />
                 </div>
               </div>
             </div>
