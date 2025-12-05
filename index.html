@@ -39,7 +39,7 @@
   <div id="root"></div>
 
   <script type="text/babel">
-    const { useState, useCallback, useMemo, useEffect } = React;
+    const { useState, useCallback, useMemo, useEffect, useRef } = React;
 
     // ==========================================
     // Data Source: Panel Presets
@@ -1437,8 +1437,8 @@
         return acc;
       }, {});
 
-      const pcsIds = Object.keys(assignmentsByPcs);
-      const maxCircuits = Math.max(...pcsIds.map(id => assignmentsByPcs[id].length));
+      const pcsIds = pcsList.map(p => p.id);
+      const maxCircuits = Math.max(...pcsIds.map(id => (assignmentsByPcs[id] || []).length));
       const rows = Array.from({ length: maxCircuits }, (_, i) => i + 1);
 
       // Calculate Helios Errors
@@ -1446,8 +1446,10 @@
         if (!isHeliosMode) return new Set();
         const errors = new Set();
         
-        Object.keys(assignmentsByPcs).forEach(pcsId => {
+        pcsIds.forEach(pcsId => {
             const assignments = assignmentsByPcs[pcsId];
+            if (!assignments) return;
+            
             const pcs = pcsList.find(p => p.id === pcsId);
             if (!pcs || !pcs.mpptCount) return;
 
@@ -1504,6 +1506,12 @@
       const handleCellContextMenu = (e, pcsId, circuitIndex) => {
           if (!onAssignmentChange) return;
           e.preventDefault();
+          
+          if (brushValue !== null) {
+              setBrushValue(null);
+              return;
+          }
+          
           onAssignmentChange(pcsId, circuitIndex, -1);
       };
 
@@ -1643,6 +1651,8 @@
     };
 
     function App() {
+      const leftPanelRef = useRef(null);
+      const rightPanelRef = useRef(null);
       const [panelPresets, setPanelPresets] = useState([]);
       const [panel, setPanel] = useState(INITIAL_PANEL);
       
@@ -1791,6 +1801,16 @@
         setManualAssignments(newAssignments);
       }, [result, manualAssignments, panel, condition.minTemperature]);
 
+      const scrollPanel = (ref, direction) => {
+          if (ref.current) {
+              const panel = ref.current;
+              panel.scrollTo({
+                  top: direction === 'top' ? 0 : panel.scrollHeight,
+                  behavior: 'smooth'
+              });
+          }
+      };
+
       const finalResult = useMemo(() => {
           if (!result) return null;
           if (!manualAssignments) return result;
@@ -1916,72 +1936,114 @@
             <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 items-start">
               
               {/* Left Column */}
-              <div className="xl:col-span-5 space-y-6 xl:sticky xl:top-24 overflow-y-auto xl:max-h-[calc(100vh-8rem)] scrollbar-hide pb-4">
-                <PanelForm 
-                    panel={panel} 
-                    onChange={handlePanelChange} 
-                    onPresetSelect={handlePanelPresetSelect} 
-                    presets={panelPresets}
-                    onSaveCustom={handleSaveCustomPanel}
-                />
+              <div className="xl:col-span-5 xl:sticky xl:top-24 xl:h-[calc(100vh-8rem)] relative group">
                 
-                {/* Simulation Button (Top) */}
-                <button
-                  onClick={handleCalculate}
-                  disabled={isCalculating}
-                  className="w-full py-3 bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-white rounded-lg font-bold shadow transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
-                >
-                  {isCalculating ? (
-                    <><i className="fa-solid fa-rotate fa-spin"></i> 計算中...</>
-                  ) : (
-                    <><i className="fa-solid fa-calculator"></i> 設計シミュレーション実行</>
-                  )}
-                </button>
+                {/* Scroll Buttons (Desktop Only) */}
+                <div className="hidden xl:flex absolute bottom-4 right-6 flex-col gap-2 z-20 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                    <button 
+                        onClick={() => scrollPanel(leftPanelRef, 'top')}
+                        className="w-10 h-10 bg-slate-800/90 hover:bg-slate-700 text-white rounded-full shadow-lg flex items-center justify-center backdrop-blur-sm transition-all transform hover:scale-110 active:scale-95"
+                        title="一番上へ"
+                    >
+                        <i className="fa-solid fa-arrow-up"></i>
+                    </button>
+                    <button 
+                        onClick={() => scrollPanel(leftPanelRef, 'bottom')}
+                        className="w-10 h-10 bg-slate-800/90 hover:bg-slate-700 text-white rounded-full shadow-lg flex items-center justify-center backdrop-blur-sm transition-all transform hover:scale-110 active:scale-95"
+                        title="一番下へ"
+                    >
+                        <i className="fa-solid fa-arrow-down"></i>
+                    </button>
+                </div>
 
-                <PcsListForm 
-                  pcsList={pcsList} 
-                  onAdd={handleAddPcs} 
-                  onRemove={handleRemovePcs} 
-                  onChange={handlePcsChange} 
-                  onPresetSelect={handlePcsPresetSelect}
-                />
-                <ConditionForm condition={condition} onChange={handleConditionChange} />
-                <SystemOverview panel={panel} pcsList={pcsList} />
-                
-                <button
-                  onClick={handleCalculate}
-                  disabled={isCalculating}
-                  className="w-full py-4 bg-slate-900 hover:bg-slate-800 active:bg-slate-950 text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-slate-900/20 transition-all flex items-center justify-center gap-3 disabled:opacity-70 disabled:cursor-not-allowed transform active:scale-[0.99]"
-                >
-                  {isCalculating ? (
-                    <><i className="fa-solid fa-rotate fa-spin"></i> Checking Constraints...</>
-                  ) : (
-                    <><i className="fa-solid fa-calculator"></i> 設計シミュレーション実行</>
-                  )}
-                </button>
+                <div ref={leftPanelRef} className="space-y-6 overflow-y-auto xl:h-full scrollbar-hide pb-4">
+                  <PanelForm 
+                      panel={panel} 
+                      onChange={handlePanelChange} 
+                      onPresetSelect={handlePanelPresetSelect} 
+                      presets={panelPresets}
+                      onSaveCustom={handleSaveCustomPanel}
+                  />
+                  
+                  {/* Simulation Button (Top) */}
+                  <button
+                    onClick={handleCalculate}
+                    disabled={isCalculating}
+                    className="w-full py-3 bg-slate-700 hover:bg-slate-600 active:bg-slate-800 text-white rounded-lg font-bold shadow transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+                  >
+                    {isCalculating ? (
+                      <><i className="fa-solid fa-rotate fa-spin"></i> 計算中...</>
+                    ) : (
+                      <><i className="fa-solid fa-calculator"></i> 設計シミュレーション実行</>
+                    )}
+                  </button>
+  
+                  <PcsListForm 
+                    pcsList={pcsList} 
+                    onAdd={handleAddPcs} 
+                    onRemove={handleRemovePcs} 
+                    onChange={handlePcsChange} 
+                    onPresetSelect={handlePcsPresetSelect}
+                  />
+                  <ConditionForm condition={condition} onChange={handleConditionChange} />
+                  <SystemOverview panel={panel} pcsList={pcsList} />
+                  
+                  <button
+                    onClick={handleCalculate}
+                    disabled={isCalculating}
+                    className="w-full py-4 bg-slate-900 hover:bg-slate-800 active:bg-slate-950 text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-slate-900/20 transition-all flex items-center justify-center gap-3 disabled:opacity-70 disabled:cursor-not-allowed transform active:scale-[0.99]"
+                  >
+                    {isCalculating ? (
+                      <><i className="fa-solid fa-rotate fa-spin"></i> Checking Constraints...</>
+                    ) : (
+                      <><i className="fa-solid fa-calculator"></i> 設計シミュレーション実行</>
+                    )}
+                  </button>
+                </div>
               </div>
 
               {/* Right Column */}
-              <div className="xl:col-span-7 space-y-6 min-h-[calc(100vh-8rem)]">
-                {finalResult ? (
-                  <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                    <SummaryPanel result={finalResult} panel={panel} pcsList={pcsList} />
-                    <VoltagePatternsPanel result={finalResult} pcsList={pcsList} panel={panel} />
-                    <ResultTable result={finalResult} pcsList={pcsList} onAssignmentChange={handleAssignmentChange} />
-                    <GlobalAlerts warnings={finalResult.globalWarnings} />
-                  </div>
-                ) : (
-                  <div className="h-full flex flex-col items-center justify-center bg-white/50 rounded-3xl border-2 border-dashed border-slate-200 text-slate-400 p-12 text-center mb-8">
-                    <div className="bg-slate-100 p-6 rounded-full mb-6">
-                      <i className="fa-solid fa-calculator text-6xl opacity-40 text-slate-600"></i>
-                    </div>
-                    <h3 className="text-xl font-bold text-slate-600 mb-2">Ready to Simulate</h3>
-                    <p className="max-w-md mx-auto text-slate-500">左側のパネル仕様・PCS構成・設置条件を入力し、「設計シミュレーション実行」ボタンを押してください。</p>
-                  </div>
-                )}
+              <div className="xl:col-span-7 xl:sticky xl:top-24 xl:h-[calc(100vh-8rem)] relative group">
                 
-                {/* Design Guide Panel (Always Visible) */}
-                <DesignGuidePanel panel={panel} pcsList={pcsList} condition={condition} />
+                {/* Scroll Buttons (Desktop Only) */}
+                <div className="hidden xl:flex absolute bottom-4 right-6 flex-col gap-2 z-20 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                    <button 
+                        onClick={() => scrollPanel(rightPanelRef, 'top')}
+                        className="w-10 h-10 bg-slate-800/90 hover:bg-slate-700 text-white rounded-full shadow-lg flex items-center justify-center backdrop-blur-sm transition-all transform hover:scale-110 active:scale-95"
+                        title="一番上へ"
+                    >
+                        <i className="fa-solid fa-arrow-up"></i>
+                    </button>
+                    <button 
+                        onClick={() => scrollPanel(rightPanelRef, 'bottom')}
+                        className="w-10 h-10 bg-slate-800/90 hover:bg-slate-700 text-white rounded-full shadow-lg flex items-center justify-center backdrop-blur-sm transition-all transform hover:scale-110 active:scale-95"
+                        title="一番下へ"
+                    >
+                        <i className="fa-solid fa-arrow-down"></i>
+                    </button>
+                </div>
+
+                <div ref={rightPanelRef} className="space-y-6 overflow-y-auto xl:h-full scrollbar-hide pb-4">
+                  {finalResult ? (
+                    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                      <SummaryPanel result={finalResult} panel={panel} pcsList={pcsList} />
+                      <VoltagePatternsPanel result={finalResult} pcsList={pcsList} panel={panel} />
+                      <ResultTable result={finalResult} pcsList={pcsList} onAssignmentChange={handleAssignmentChange} />
+                      <GlobalAlerts warnings={finalResult.globalWarnings} />
+                    </div>
+                  ) : (
+                    <div className="h-full flex flex-col items-center justify-center bg-white/50 rounded-3xl border-2 border-dashed border-slate-200 text-slate-400 p-12 text-center mb-8">
+                      <div className="bg-slate-100 p-6 rounded-full mb-6">
+                        <i className="fa-solid fa-calculator text-6xl opacity-40 text-slate-600"></i>
+                      </div>
+                      <h3 className="text-xl font-bold text-slate-600 mb-2">Ready to Simulate</h3>
+                      <p className="max-w-md mx-auto text-slate-500">左側のパネル仕様・PCS構成・設置条件を入力し、「設計シミュレーション実行」ボタンを押してください。</p>
+                    </div>
+                  )}
+                  
+                  {/* Design Guide Panel (Always Visible) */}
+                  <DesignGuidePanel panel={panel} pcsList={pcsList} condition={condition} />
+                </div>
               </div>
             </div>
           </main>
