@@ -859,6 +859,49 @@
       </section>
     );
 
+    // --- SystemOverview (New) ---
+    const SystemOverview = ({ panel, pcsList }) => {
+      // Calculate DC Capacity
+      const dcCapacityKw = (panel.pmax && panel.moduleCount) 
+        ? (panel.pmax * panel.moduleCount) / 1000 
+        : 0;
+
+      // Calculate AC Capacity
+      const acCapacityKw = pcsList.reduce((acc, pcs) => acc + (Number(pcs.ratedPower) || 0), 0) / 1000;
+
+      // Calculate Overload Ratio
+      const overloadRatio = acCapacityKw > 0 ? (dcCapacityKw / acCapacityKw) * 100 : 0;
+
+      return (
+        <section className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
+          <h2 className="flex items-center gap-2 text-lg font-bold text-slate-800 mb-4 pb-2 border-b border-slate-100">
+            <i className="fa-solid fa-chart-pie text-indigo-500 text-xl"></i>
+            システム概要 (概算)
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-1">
+               <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">DC総容量</label>
+               <div className="text-xl font-bold text-slate-700">
+                 {dcCapacityKw.toFixed(2)} <span className="text-sm text-slate-500">kW</span>
+               </div>
+            </div>
+            <div className="space-y-1">
+               <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">AC総容量</label>
+               <div className="text-xl font-bold text-slate-700">
+                 {acCapacityKw.toFixed(2)} <span className="text-sm text-slate-500">kW</span>
+               </div>
+            </div>
+            <div className="space-y-1">
+               <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">過積載率</label>
+               <div className={`text-xl font-bold ${overloadRatio > 150 ? 'text-red-600' : 'text-slate-700'}`}>
+                 {overloadRatio.toFixed(1)} <span className="text-sm text-slate-500">%</span>
+               </div>
+            </div>
+          </div>
+        </section>
+      );
+    };
+
     // --- GlobalAlerts ---
     const GlobalAlerts = ({ warnings }) => {
       if (!warnings || warnings.length === 0) return null;
@@ -1376,6 +1419,17 @@
       if (result.assignments.length === 0) return null;
       
       const [isHeliosMode, setIsHeliosMode] = useState(false);
+      const [brushValue, setBrushValue] = useState(null);
+
+      useEffect(() => {
+        const handleKeyDown = (e) => {
+            if (e.key === 'Escape') {
+                setBrushValue(null);
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+      }, []);
 
       const assignmentsByPcs = result.assignments.reduce((acc, curr) => {
         if (!acc[curr.pcsId]) acc[curr.pcsId] = [];
@@ -1420,10 +1474,32 @@
         return errors;
       }, [isHeliosMode, result.assignments, pcsList]);
 
-      const handleCellClick = (e, pcsId, circuitIndex) => {
+      const handleCellClick = (e, pcsId, circuitIndex, currentVal) => {
           if (!onAssignmentChange) return;
           e.preventDefault();
-          onAssignmentChange(pcsId, circuitIndex, 1);
+          
+          if (e.shiftKey) {
+              // Reset to 0 by subtracting current value
+              onAssignmentChange(pcsId, circuitIndex, -currentVal);
+              return;
+          }
+          
+          if (e.altKey) {
+              // Spoid: Set brush value
+              setBrushValue(currentVal);
+              return;
+          }
+
+          if (brushValue !== null) {
+              // Paint: Overwrite with brush value
+              const diff = brushValue - currentVal;
+              if (diff !== 0) {
+                  onAssignmentChange(pcsId, circuitIndex, diff);
+              }
+          } else {
+              // Normal: Increment
+              onAssignmentChange(pcsId, circuitIndex, 1);
+          }
       };
       const handleCellContextMenu = (e, pcsId, circuitIndex) => {
           if (!onAssignmentChange) return;
@@ -1438,9 +1514,24 @@
               <i className="fa-solid fa-grip text-slate-500"></i>
               <div>
                 <h3 className="font-bold text-slate-700 leading-none">回路割付表 (Matrix)</h3>
-                <div className="flex items-center gap-1 mt-1 text-[10px] text-slate-400">
-                    <i className="fa-solid fa-arrow-pointer"></i>
-                    <span>左クリック: +1 / 右クリック: -1</span>
+                <div className="flex items-center gap-2 mt-1">
+                    <div className="flex items-center gap-1 text-[10px] text-slate-400">
+                        <i className="fa-solid fa-arrow-pointer"></i>
+                        <span>左: +1 / 右: -1 / Shift: 0 / Alt: スポイト</span>
+                    </div>
+                    {brushValue !== null && (
+                        <div className="flex items-center gap-2 px-2 py-0.5 bg-blue-50 border border-blue-200 rounded text-xs text-blue-700 font-bold animate-pulse">
+                            <i className="fa-solid fa-paintbrush"></i>
+                            <span>ブラシ: {brushValue}枚</span>
+                            <button 
+                                onClick={(e) => { e.stopPropagation(); setBrushValue(null); }}
+                                className="ml-1 hover:text-blue-900"
+                                title="ブラシ解除 (Esc)"
+                            >
+                                <i className="fa-solid fa-xmark"></i>
+                            </button>
+                        </div>
+                    )}
                 </div>
               </div>
             </div>
@@ -1517,8 +1608,8 @@
                             key={`${pcsId}-${rowNum}`} 
                             className={`p-1 text-center align-middle cursor-pointer select-none ${
                                 isMpptBottom ? "border-b-2 border-slate-400" : "border-b border-slate-100"
-                            }`}
-                            onClick={(e) => handleCellClick(e, pcsId, rowNum)}
+                            } ${brushValue !== null ? "cursor-cell" : ""}`}
+                            onClick={(e) => handleCellClick(e, pcsId, rowNum, modules)}
                             onContextMenu={(e) => handleCellContextMenu(e, pcsId, rowNum)}
                             title="クリックで増減"
                         >
@@ -1855,6 +1946,7 @@
                   onPresetSelect={handlePcsPresetSelect}
                 />
                 <ConditionForm condition={condition} onChange={handleConditionChange} />
+                <SystemOverview panel={panel} pcsList={pcsList} />
                 
                 <button
                   onClick={handleCalculate}
