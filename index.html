@@ -576,7 +576,7 @@
     }
 
     // --- Excel Export Logic ---
-    const exportToExcel = (result, panel, pcsList, condition) => {
+    const exportToExcel = (result, panel, pcsList, condition, projectName) => {
         if (!result) return;
 
         const wb = XLSX.utils.book_new();
@@ -585,6 +585,7 @@
         // --- Sheet 1: 設計サマリー ---
         const summaryRows = [
             ["Solar Circuit Designer - 設計シミュレーション結果報告書"],
+            ["発電所名", projectName || "未設定"],
             ["出力日時", now],
             [],
             ["【1. 設置条件】"],
@@ -1169,7 +1170,10 @@
             </p>
 
             <div className="mt-4 p-4 bg-slate-50 rounded border border-slate-200 text-[11px] text-slate-600 leading-relaxed space-y-3">
-                <p className="font-bold border-b border-slate-200 pb-1">【パワーコンディショナの入力系統における許容電流の取り扱い原則】</p>
+                <p className="font-bold border-b border-slate-200 pb-1">
+                    【パワーコンディショナの入力系統における許容電流の取り扱い原則】
+                    <span className="block text-red-500 text-[10px] font-normal mt-1">※ ファーウェイ製パワーコンディショナに限る</span>
+                </p>
                 <p>
                     入力系統（MPPT）の許容電流、ストリング単位の定格電流、入力短絡電流の上限は、それぞれ独立した設計上の制約として扱います。
                 </p>
@@ -1201,15 +1205,27 @@
     };
 
     // --- SummaryPanel ---
-    const SummaryPanel = ({ result, panel, pcsList }) => {
+    const SummaryPanel = ({ result, panel, pcsList, projectName, onProjectNameChange, condition }) => {
       if (result.summaries.length === 0) return null;
 
       return (
         <section className="space-y-6">
-          <div className="flex justify-end">
+          <div className="flex flex-col md:flex-row justify-between items-end md:items-center gap-4">
+            {/* Project Name Input */}
+            <div className="w-full md:max-w-md">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1">発電所名 (プロジェクト名)</label>
+                <input 
+                    type="text" 
+                    value={projectName}
+                    onChange={(e) => onProjectNameChange(e.target.value)}
+                    placeholder="例: 〇〇太陽光発電所"
+                    className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-200 transition-all"
+                />
+            </div>
+
             <button
-                onClick={() => exportToExcel(result, panel, pcsList, { minTemperature: -10, targetOverloadRatio: 120 })} 
-                className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2 px-4 rounded-lg flex items-center gap-2 shadow-sm transition-all"
+                onClick={() => exportToExcel(result, panel, pcsList, condition, projectName)} 
+                className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2 px-4 rounded-lg flex items-center gap-2 shadow-sm transition-all flex-shrink-0"
             >
                 <i className="fa-solid fa-file-excel"></i>
                 Excel出力
@@ -1842,6 +1858,7 @@
     function App() {
       const leftPanelRef = useRef(null);
       const rightPanelRef = useRef(null);
+      const [projectName, setProjectName] = useState('');
       const [panelPresets, setPanelPresets] = useState([]);
       const [panel, setPanel] = useState(INITIAL_PANEL);
       
@@ -2249,6 +2266,22 @@
                     </div>
                     <p className="text-xs text-slate-400 mt-2">※ 「計算対象温度」は寒冷時の電圧チェック(Min Temp)と詳細分析(Spot)の両方に使用されます</p>
                     <p className="text-xs text-slate-400">※ 直列数を0にすると自動計算されます</p>
+                    
+                    <div className="mt-4 pt-3 border-t border-slate-100">
+                        <p className="text-xs text-slate-500 mb-1">
+                            <i className="fa-solid fa-temperature-arrow-down mr-1 text-blue-400"></i>
+                            最低気温の調査はこちら（気象庁）：
+                        </p>
+                        <a 
+                            href="https://www.data.jma.go.jp/stats/etrn/" 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-xs font-bold text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1"
+                        >
+                            <i className="fa-solid fa-up-right-from-square"></i>
+                            過去の気象データ検索
+                        </a>
+                    </div>
                   </section>
                   
                   {/* Simulation Button (Top) */}
@@ -2311,9 +2344,17 @@
                 </div>
 
                 <div ref={rightPanelRef} className="space-y-6 overflow-y-auto xl:h-full scrollbar-hide pb-4">
+                  
                   {finalResult ? (
                     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                      <SummaryPanel result={finalResult} panel={panel} pcsList={pcsList} />
+                      <SummaryPanel 
+                        result={finalResult} 
+                        panel={panel} 
+                        pcsList={pcsList} 
+                        projectName={projectName} 
+                        onProjectNameChange={setProjectName}
+                        condition={condition} 
+                      />
                       <VoltagePatternsPanel result={finalResult} pcsList={pcsList} panel={panel} spotCondition={spotCondition} />
                       <ResultTable result={finalResult} pcsList={pcsList} onAssignmentChange={handleAssignmentChange} />
                       <GlobalAlerts warnings={finalResult.globalWarnings} />
