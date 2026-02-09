@@ -833,7 +833,10 @@
     };
 
     // --- PCS List Form (Updated) ---
-    const PcsListForm = ({ pcsList, onAdd, onRemove, onChange, onPresetSelect }) => (
+    const PcsListForm = ({ pcsList, onAdd, onBulkAdd, onRemove, onChange, onPresetSelect }) => {
+      const [bulkCount, setBulkCount] = useState(1);
+
+      return (
       <section className="space-y-4">
         {pcsList.map((pcs, index) => {
            // Check if current model matches a preset
@@ -842,7 +845,8 @@
            return (
           <div key={pcs.id} className="bg-white rounded-xl p-6 shadow-sm border border-slate-200 relative group">
             <div className="absolute top-4 right-4 flex gap-2">
-              {pcsList.length > 1 && (
+              {/* PCS1 (index 0) cannot be removed */}
+              {index > 0 && (
                 <button onClick={() => onRemove(pcs.id)} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors" title="このPCSを削除">
                   <i className="fa-solid fa-trash"></i>
                 </button>
@@ -888,12 +892,38 @@
             </div>
           </div>
         );})}
-        <button onClick={onAdd} className="w-full py-3 border-2 border-dashed border-slate-300 rounded-xl text-slate-500 font-bold hover:border-indigo-400 hover:text-indigo-500 hover:bg-indigo-50 transition-all flex items-center justify-center gap-2">
-          <i className="fa-solid fa-plus"></i>
-          PCSを追加
-        </button>
+        
+        <div className="flex flex-col sm:flex-row gap-2">
+            <button onClick={onAdd} className="flex-1 py-3 border-2 border-dashed border-slate-300 rounded-xl text-slate-500 font-bold hover:border-indigo-400 hover:text-indigo-500 hover:bg-indigo-50 transition-all flex items-center justify-center gap-2">
+              <i className="fa-solid fa-plus"></i>
+              PCSを追加 (1台)
+            </button>
+            
+            <div className="flex items-center gap-2 bg-slate-100 p-2 rounded-xl border border-slate-200 sm:w-auto w-full justify-center">
+                <input 
+                    type="number" 
+                    min="1" 
+                    max="50" 
+                    value={bulkCount} 
+                    onChange={(e) => {
+                        const val = parseInt(e.target.value);
+                        if (!isNaN(val)) setBulkCount(Math.max(1, Math.min(50, val)));
+                    }}
+                    className="w-16 px-2 py-1 rounded border border-slate-300 text-center font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                />
+                <span className="text-xs font-bold text-slate-500 whitespace-nowrap">台</span>
+                <button 
+                    onClick={() => onBulkAdd(bulkCount)}
+                    className="px-4 py-2 bg-slate-600 text-white rounded-lg font-bold text-sm hover:bg-slate-700 transition-all whitespace-nowrap shadow-sm"
+                >
+                    <i className="fa-solid fa-layer-group mr-1"></i>
+                    一括追加
+                </button>
+            </div>
+        </div>
       </section>
-    );
+      );
+    };
 
     // --- Condition Form ---
     const ConditionForm = ({ condition, onChange }) => (
@@ -1938,18 +1968,43 @@
         const lastPcs = prev[prev.length - 1];
         const baseData = lastPcs ? { ...lastPcs } : { ...INITIAL_PCS };
         
-        // Ensure Unique ID
-        let newNum = prev.length + 1;
-        const existingIds = new Set(prev.map(p => p.id));
-        // Fix infinite loop potential: limit iterations or ensure loop breaks
-        // Also, prev.length might be smaller if items were deleted, so newNum might already exist.
-        // Just find the smallest available number starting from 1
-        newNum = 1;
-        while (existingIds.has(`PCS${newNum}`)) {
-            newNum++;
-        }
+        let currentMaxIdNum = 0;
+        prev.forEach(p => {
+            const match = p.id.match(/^PCS(\d+)$/);
+            if (match) {
+                const num = parseInt(match[1]);
+                if (num > currentMaxIdNum) currentMaxIdNum = num;
+            }
+        });
+        
+        // Find smallest available ID if we want to fill gaps, OR just increment max.
+        // Incrementing max is safer to avoid confusion.
+        const newNum = currentMaxIdNum + 1;
 
         return [...prev, { ...baseData, id: `PCS${newNum}` }];
+      }), []);
+
+      const handleBulkAddPcs = useCallback((count) => setPcsList(prev => {
+        const lastPcs = prev[prev.length - 1];
+        const baseData = lastPcs ? { ...lastPcs } : { ...INITIAL_PCS };
+        
+        let newPcsList = [...prev];
+        let currentMaxIdNum = 0;
+        
+        prev.forEach(p => {
+            const match = p.id.match(/^PCS(\d+)$/);
+            if (match) {
+                const num = parseInt(match[1]);
+                if (num > currentMaxIdNum) currentMaxIdNum = num;
+            }
+        });
+
+        for (let i = 0; i < count; i++) {
+            currentMaxIdNum++;
+            newPcsList.push({ ...baseData, id: `PCS${currentMaxIdNum}` });
+        }
+
+        return newPcsList;
       }), []);
 
       const handleRemovePcs = useCallback((id) => setPcsList(prev => prev.filter(pcs => pcs.id !== id)), []);
@@ -2190,8 +2245,8 @@
                 </div>
               </div>
               <div className="hidden md:block text-xs text-slate-400 text-right">
-                <p>Last Updated: 2025.12.05</p>
-                <p>Version 1.3.1</p>
+                <p>Last Updated: 2026.02.09</p>
+                <p>Version 1.3.2</p>
               </div>
             </div>
           </header>
@@ -2300,6 +2355,7 @@
                   <PcsListForm 
                     pcsList={pcsList} 
                     onAdd={handleAddPcs} 
+                    onBulkAdd={handleBulkAddPcs}
                     onRemove={handleRemovePcs} 
                     onChange={handlePcsChange} 
                     onPresetSelect={handlePcsPresetSelect}
