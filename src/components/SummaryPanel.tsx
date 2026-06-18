@@ -1,6 +1,6 @@
 import React from 'react';
 import { DesignResult, PanelSpec } from '../types';
-import { AlertTriangle, CheckCircle2, Info, Zap, Server, BatteryWarning } from 'lucide-react';
+import { CheckCircle2, Info, Zap, Server, BatteryWarning } from 'lucide-react';
 import clsx from 'clsx';
 
 interface Props {
@@ -10,8 +10,6 @@ interface Props {
 
 export const SummaryPanel: React.FC<Props> = ({ result, panel }) => {
   if (result.summaries.length === 0) return null;
-
-  const hasGlobalWarnings = result.globalWarnings.length > 0;
 
   return (
     <section className="space-y-6">

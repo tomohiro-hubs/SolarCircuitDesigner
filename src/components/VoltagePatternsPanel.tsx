@@ -1,6 +1,6 @@
 import React from 'react';
 import { DesignResult, PcsSpec, PanelSpec } from '../types';
-import { Zap, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Zap, AlertTriangle } from 'lucide-react';
 import clsx from 'clsx';
 
 interface Props {

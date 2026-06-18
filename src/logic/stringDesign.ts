@@ -41,8 +41,8 @@ export function calculateAllowedSeriesRange(
  */
 export function selectBestSeriesCount(
   range: { min: number; max: number },
-  panel: PanelSpec,
-  allPcs: PcsSpec[]
+  _panel: PanelSpec,
+  _allPcs: PcsSpec[]
 ): number {
   // シンプル版: 最大枚数を採用 (電圧高めの方が効率が良い傾向があるため)
   // TODO: 全体の枚数配分を考慮した最適化
@@ -55,7 +55,7 @@ export function selectBestSeriesCount(
 export function checkCurrentConstraints(
   panel: PanelSpec,
   pcs: PcsSpec,
-  stringDesign: StringDesign
+  _stringDesign: StringDesign
 ): string[] {
   const warnings: string[] = [];
   
@@ -191,7 +191,6 @@ export function calculateDesign(
 
   // 結果オブジェクトの構築
   for (const pcs of pcsList) {
-    const pcsAssignments: CircuitAssignment[] = [];
     let modulesAssignedToPcs = 0;
     let usedCircuits = 0;
     const pcsWarnings: string[] = [...checkCurrentConstraints(panel, pcs, stringDesign)];
