@@ -134,37 +134,37 @@ function fillPcs(info: PcsPlanInfo, budget: number): Map<number, number> {
     return result;
   }
 
-  let budgetLeft = Math.min(budget, usableCircuits * nMax);
-  let circuitIndex = 1;
-  let circuitsRemaining = usableCircuits;
+  const M = Math.min(budget, usableCircuits * nMax);
 
-  // MPPTペア（連続2回路）単位で、直列数を揃えながら配分する。
-  while (circuitsRemaining >= 2 && budgetLeft >= nMin) {
-    if (budgetLeft < 2 * nMin) {
-      // ペアを組めるだけの残枚数がない → 1回路だけ使う（ペア均等制約は非適用）
-      const s = Math.min(Math.max(budgetLeft, nMin), nMax);
-      result.set(circuitIndex, s);
-      budgetLeft -= s;
-      break;
-    }
-
-    // このペアの1回路あたり直列数（残りを均等に広げつつ範囲内にクランプ）
-    let s = Math.round(budgetLeft / circuitsRemaining);
-    s = Math.min(s, Math.floor(budgetLeft / 2)); // ペア(2回路)で予算を超えない
-    s = Math.min(Math.max(s, nMin), nMax);
-
-    result.set(circuitIndex, s);
-    result.set(circuitIndex + 1, s);
-    budgetLeft -= 2 * s;
-    circuitIndex += 2;
-    circuitsRemaining -= 2;
+  // 使用回路数 c: 各回路が nMin 以上になる範囲でできるだけ多くの回路に分散する
+  // （電流を分散し、MPPTを均等に使うため）。
+  const c = Math.min(usableCircuits, Math.floor(M / nMin));
+  if (c < 1) {
+    return result;
   }
 
-  // 端数の単独回路（usableCircuitsが奇数）に、残枚数があれば1回路だけ配置
-  if (circuitsRemaining === 1 && budgetLeft >= nMin) {
-    const s = Math.min(Math.max(budgetLeft, nMin), nMax);
-    result.set(circuitIndex, s);
-    budgetLeft -= s;
+  // 基準直列数 base を全 c 回路に置き、端数(extra)をペア単位で +1 して均一に近づける。
+  const base = Math.min(Math.max(Math.floor(M / c), nMin), nMax);
+  for (let i = 1; i <= c; i += 1) {
+    result.set(i, base);
+  }
+
+  let extra = M - base * c; // 0 <= extra < c（base==nMax のときは 0）
+  const pairs = Math.floor(c / 2);
+  const hasSingleton = c % 2 === 1;
+
+  // MPPTペア（連続2回路）に +1 ずつ乗せる（ペアの直列数は必ず揃う）
+  let bumpPairs = Math.min(pairs, Math.floor(extra / 2));
+  for (let p = 0; p < bumpPairs && base + 1 <= nMax; p += 1) {
+    result.set(2 * p + 1, base + 1);
+    result.set(2 * p + 2, base + 1);
+    extra -= 2;
+  }
+
+  // 端数の単独回路が使える場合、残り1枚をそこへ（ペア均等制約は単独回路には非適用）
+  if (hasSingleton && extra >= 1 && base + 1 <= nMax) {
+    result.set(c, (result.get(c) ?? base) + 1);
+    extra -= 1;
   }
 
   return result;
@@ -184,49 +184,48 @@ export function computeDeterministicAiAssignments(
   const infos = buildPcsPlanInfo(panel, pcsList, condition);
   const targetRatio = condition.targetOverloadRatio > 0 ? condition.targetOverloadRatio / 100 : 1.45;
 
-  // 各PCSの最大収容枚数と、目標過積載率での希望枚数
+  const evenFloor = (x: number) => x - (x % 2);
+
+  // 各PCSの最大収容枚数（ペア単位で扱うため偶数に丸める）と全体の配置可能枚数
   const maxModules = infos.map((info) => info.usableCircuits * info.nMax);
-  const totalCapacity = maxModules.reduce((a, b) => a + b, 0);
+  const evenMax = maxModules.map(evenFloor);
+  const totalCapacity = evenMax.reduce((a, b) => a + b, 0);
   const placeableTotal = Math.min(panel.moduleCount, totalCapacity);
 
-  // 初期配分: 目標過積載率での希望枚数（各PCS上限でクランプ）
+  // 初期配分: 目標過積載率での希望枚数を「偶数（ペア単位）」で。各PCS上限でクランプ。
+  // 定格容量に比例させることで、全PCSの過積載率が揃う。
   const budgets = infos.map((info, i) => {
     if (info.usableCircuits < 1) return 0;
-    const desired = panel.pmax > 0 ? Math.round((info.pcs.ratedPower * targetRatio) / panel.pmax) : maxModules[i];
-    return Math.min(desired, maxModules[i]);
+    const desired = panel.pmax > 0 ? (info.pcs.ratedPower * targetRatio) / panel.pmax : evenMax[i];
+    return Math.min(evenFloor(Math.round(desired)), evenMax[i]);
   });
 
-  // 残枚数(placeableTotal)に合わせて配分を増減する
-  const adjust = (delta: number) => {
-    // delta>0: 増やす（headroomのあるPCSへ）／delta<0: 減らす
-    let remaining = delta;
-    // 決定的にするため index 昇順で回す
+  // placeableTotal に合わせ、ペア単位(±2)で全PCSへ均等(ラウンドロビン)に増減する。
+  // 端数を1台に押し付けず、過積載率のばらつきを最小化する。端数(±1)はペアで詰められないため残す。
+  const balance = (target: number) => {
+    let remaining = target - budgets.reduce((a, b) => a + b, 0);
     let guard = 0;
-    while (remaining !== 0 && guard < 100000) {
+    while (Math.abs(remaining) >= 2 && guard < 10000000) {
       guard += 1;
       let moved = false;
-      for (let i = 0; i < infos.length && remaining !== 0; i += 1) {
+      for (let i = 0; i < infos.length && Math.abs(remaining) >= 2; i += 1) {
         if (infos[i].usableCircuits < 1) continue;
-        if (remaining > 0 && budgets[i] < maxModules[i]) {
-          const step = Math.min(remaining, maxModules[i] - budgets[i]);
-          budgets[i] += step;
-          remaining -= step;
+        if (remaining >= 2 && budgets[i] <= evenMax[i] - 2) {
+          budgets[i] += 2;
+          remaining -= 2;
           moved = true;
-        } else if (remaining < 0 && budgets[i] > 0) {
-          const step = Math.min(-remaining, budgets[i]);
-          budgets[i] -= step;
-          remaining += step;
+        } else if (remaining <= -2 && budgets[i] >= 2) {
+          budgets[i] -= 2;
+          remaining += 2;
           moved = true;
         }
       }
       if (!moved) break;
     }
   };
+  balance(placeableTotal);
 
-  const budgetSum = budgets.reduce((a, b) => a + b, 0);
-  adjust(placeableTotal - budgetSum);
-
-  // 各PCSを配分に従って埋め、端数はさらに詰める
+  // 各PCSを配分に従って埋める（偶数バジェットは fillPcs が過不足なく実現する）
   const assignments: AiAssignment[] = [];
   let placedTotal = 0;
 
@@ -238,11 +237,9 @@ export function computeDeterministicAiAssignments(
     }
   });
 
-  // まだ残枚数がある場合、余力のあるPCSの直列数/回路を増やして詰める（決定的）
+  // 端数(1枚)が残る場合のみ、単独回路が使えるPCSへ1枚だけ載せて詰める（決定的）
   let leftover = placeableTotal - placedTotal;
   if (leftover > 0) {
-    // 既存割付を circuitIndex 昇順で辿り、nMax まで引き上げる。
-    // ただしMPPTペアは揃える必要があるので、同一ペアは同時に+1する。
     const byPcs = new Map<string, Map<number, number>>();
     assignments.forEach((a) => {
       if (!byPcs.has(a.pcsId)) byPcs.set(a.pcsId, new Map());
@@ -250,55 +247,33 @@ export function computeDeterministicAiAssignments(
     });
 
     let guard = 0;
-    while (leftover > 0 && guard < 1000000) {
+    while (leftover > 0 && guard < 100000) {
       guard += 1;
       let progressed = false;
-
       for (const info of infos) {
         if (leftover <= 0) break;
         if (info.usableCircuits < 1) continue;
-        const map = byPcs.get(info.pcs.id);
-        if (!map) continue;
+        const map = byPcs.get(info.pcs.id) ?? new Map<number, number>();
 
-        // ペア単位(odd/even circuit)で +1 を試みる
-        for (let ci = 1; ci <= info.usableCircuits && leftover > 0; ci += 2) {
-          const isPair = ci + 1 <= info.usableCircuits;
-          const a = map.get(ci) ?? 0;
-          const b = isPair ? (map.get(ci + 1) ?? 0) : 0;
-
-          if (isPair) {
-            // 両回路とも使用中かつ同値で nMax 未満なら +1 ずつ（2枚消費）
-            if (a > 0 && a === b && a < info.nMax && leftover >= 2) {
-              map.set(ci, a + 1);
-              map.set(ci + 1, b + 1);
-              leftover -= 2;
-              progressed = true;
-            } else if (a === 0 && b === 0 && leftover >= 2 * info.nMin) {
-              // 未使用ペアを新規に nMin で起こす
-              map.set(ci, info.nMin);
-              map.set(ci + 1, info.nMin);
-              leftover -= 2 * info.nMin;
-              progressed = true;
-            }
-          } else {
-            // 端数の単独回路
-            if (a > 0 && a < info.nMax && leftover >= 1) {
-              map.set(ci, a + 1);
-              leftover -= 1;
-              progressed = true;
-            } else if (a === 0 && leftover >= info.nMin) {
-              map.set(ci, info.nMin);
-              leftover -= info.nMin;
-              progressed = true;
-            }
+        // 端数の単独回路（奇数番目の未ペア回路）に +1 / nMin で新規起こし
+        const lastOdd = info.usableCircuits % 2 === 1 ? info.usableCircuits : 0;
+        if (lastOdd) {
+          const cur = map.get(lastOdd) ?? 0;
+          if (cur > 0 && cur < info.nMax) {
+            map.set(lastOdd, cur + 1);
+            leftover -= 1;
+            progressed = true;
+          } else if (cur === 0 && leftover >= info.nMin) {
+            map.set(lastOdd, info.nMin);
+            leftover -= info.nMin;
+            progressed = true;
           }
+          byPcs.set(info.pcs.id, map);
         }
       }
-
       if (!progressed) break;
     }
 
-    // byPcs を assignments に反映し直す
     assignments.length = 0;
     for (const [pcsId, map] of byPcs) {
       for (const [circuitIndex, seriesModules] of map) {
