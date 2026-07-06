@@ -8,7 +8,7 @@ interface Env {
 }
 
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
-const DEFAULT_MODEL = 'gemini-2.5-flash';
+const DEFAULT_MODEL = 'gemini-3.1-flash-lite';
 const REQUEST_TIMEOUT_MS = 60000;
 const MAX_PCS_COUNT = 12;
 const MAX_TOTAL_CIRCUITS = 256;
@@ -204,6 +204,8 @@ function buildPromptText(body: AiDesignRequest): string {
     `6. パネル総数 ${panel.moduleCount} 枚を超えて割り当てない。余りが出ても電圧設計を崩す数合わせはしない。`,
     '7. 選択されている各PCSの仕様（MPPT電圧範囲・最大入力電圧・回路/合計の電流制限など）にマッチした回路設計にする。',
     '8. 使わない回路は assignments に含めなくてよい（含める場合は seriesModules を 0 にする）。',
+    `9. 【完全性】パネル総数 ${panel.moduleCount} 枚を可能な限り全て割り付ける。余りが出るのは、上記の電圧範囲・電流制限・MPPT均等などの制約でどうしても入らない場合に限る。制約が許す限り、空き回路を使ってでも残枚数を最小化すること。`,
+    '10. 【網羅】使用する回路は assignments に1つ残らず列挙する（要約の説明と assignments の実データを必ず一致させる。「全回路使用」と書いたのに一部しか列挙しない、といった不整合を起こさない）。',
     '',
     '返答は指定された JSON Schema に厳密準拠した JSON のみを返してください。',
     '',
@@ -241,6 +243,11 @@ async function requestGeminiSuggestion(body: AiDesignRequest, env: Env) {
           generationConfig: {
             responseMimeType: 'application/json',
             responseSchema: suggestionSchema,
+            // 決定性を上げて実行ごとのブレを抑える。
+            temperature: 0,
+            topP: 1,
+            // 回路数が多い場合でも全回路を列挙しきれるよう出力上限を拡大。
+            maxOutputTokens: 16384,
           },
         }),
       }
