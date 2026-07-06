@@ -336,8 +336,8 @@ function App() {
               )}
             </button>
             <div className="hidden md:block text-xs text-slate-400 text-right">
-              <p>Last Updated: 2025.12.01</p>
-              <p>Version 1.3.0</p>
+              <p>Last Updated: 2026.07.06</p>
+              <p>Version 1.4.0</p>
             </div>
           </div>
         </div>
