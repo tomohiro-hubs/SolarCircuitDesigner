@@ -42,6 +42,16 @@
     const { useState, useCallback, useMemo, useEffect, useRef } = React;
 
     // ==========================================
+    // AI自動設計 API エンドポイント
+    // GitHub Pages は静的配信のため /api/ai-design を実行できない。
+    // Cloudflare Pages / Vercel などにデプロイした API の絶対URLをここに設定する。
+    // （同一オリジンで動かす場合のみ空文字にして相対パス '/api/ai-design' を使う）
+    // 例: 'https://solar-circuit-designer.pages.dev'
+    // ==========================================
+    const AI_API_BASE = 'https://solar-circuit-designer.pages.dev';
+    const AI_DESIGN_ENDPOINT = (AI_API_BASE ? AI_API_BASE.replace(/\/$/, '') : '') + '/api/ai-design';
+
+    // ==========================================
     // Data Source: Panel Presets
     // ==========================================
     const DEFAULT_PANEL_PRESETS = [
@@ -2288,7 +2298,7 @@
             setResult(baselineResult);
           }
 
-          const response = await fetch('/api/ai-design', {
+          const response = await fetch(AI_DESIGN_ENDPOINT, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json'

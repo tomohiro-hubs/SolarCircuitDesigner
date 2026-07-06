@@ -47,6 +47,8 @@ function json(body: unknown, init?: ResponseInit): Response {
     ...init,
     headers: {
       'Content-Type': 'application/json; charset=utf-8',
+      // 別オリジン（GitHub Pages 等）のフロントから叩けるよう常にCORSを付与。
+      'Access-Control-Allow-Origin': '*',
       ...(init?.headers ?? {}),
     },
   });

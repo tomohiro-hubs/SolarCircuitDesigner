@@ -37,7 +37,15 @@ const suggestionSchema = {
   },
 } as const;
 
+function setCors(res: any) {
+  // 別オリジン（GitHub Pages 等）のフロントから叩けるようCORSを付与。
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+}
+
 function json(res: any, status: number, body: unknown) {
+  setCors(res);
   res.status(status).setHeader('Content-Type', 'application/json; charset=utf-8');
   res.send(JSON.stringify(body));
 }
@@ -269,6 +277,12 @@ async function requestGeminiSuggestion(body: AiDesignRequest) {
 }
 
 export default async function handler(req: any, res: any) {
+  if (req.method === 'OPTIONS') {
+    setCors(res);
+    res.status(204).end();
+    return;
+  }
+
   if (req.method !== 'POST') {
     return json(res, 405, { error: 'Method not allowed' });
   }
