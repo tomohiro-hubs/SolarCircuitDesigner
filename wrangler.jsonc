@@ -1,0 +1,9 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "solar-circuit-designer",
+  "pages_build_output_dir": "./dist",
+  "compatibility_date": "2026-07-06",
+  "vars": {
+    "GEMINI_MODEL": "gemini-2.5-flash"
+  }
+}

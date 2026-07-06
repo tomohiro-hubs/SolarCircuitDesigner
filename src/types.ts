@@ -67,3 +67,28 @@ export type DesignResult = {
   totalPcsCapacityKw: number;
   globalWarnings: string[];
 };
+
+export type AiDesignRequest = {
+  panel: PanelSpec;
+  pcsList: PcsSpec[];
+  condition: SiteCondition;
+  baselineResult: DesignResult;
+};
+
+export type AiAssignment = {
+  pcsId: string;
+  circuitIndex: number;
+  seriesModules: number;
+};
+
+export type AiDesignSuggestion = {
+  summary: string;
+  reasoning: string[];
+  warnings: string[];
+  assignments: AiAssignment[];
+};
+
+export type AiDesignResponse = {
+  suggestion: AiDesignSuggestion;
+  model: string;
+};
