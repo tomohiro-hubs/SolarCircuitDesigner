@@ -122,6 +122,19 @@ function buildPcsPlanInfo(
 }
 
 /**
+ * 使用不可のPCSについて、その理由を返す（0枚しか割り付けられない原因の説明用）。
+ */
+export function diagnoseUnusablePcs(
+  panel: PanelSpec,
+  pcsList: PcsSpec[],
+  condition: SiteCondition
+): string[] {
+  return buildPcsPlanInfo(panel, pcsList, condition)
+    .filter((info) => info.usableCircuits < 1)
+    .map((info) => info.reason || `${info.pcs.id}: 使用可能な回路がありません`);
+}
+
+/**
  * 1つのPCSに対し、割り当てたいモジュール数(budget)を
  * 「MPPTは2回路1組で直列数を揃える／各回路は[nMin,nMax]／1〜2枚構成なし」という
  * 制約下で回路へ配分する。戻り値は circuitIndex(1始まり) → seriesModules。

@@ -900,6 +900,7 @@
               <InputField label="最大入力電圧" value={pcs.maxInputVoltage} onChange={(v) => onChange(pcs.id, 'maxInputVoltage', v)} unit="V" disabled={!isCustom} />
               <InputField label="最大入力電流/回路" value={pcs.maxInputCurrentPerCircuit} onChange={(v) => onChange(pcs.id, 'maxInputCurrentPerCircuit', v)} unit="A" disabled={!isCustom} />
               <InputField label="最大短絡電流/回路" value={pcs.maxIscPerCircuit} onChange={(v) => onChange(pcs.id, 'maxIscPerCircuit', v)} unit="A" disabled={!isCustom} />
+              <InputField label="最大短絡電流/PCS合計" value={pcs.maxIscTotal} onChange={(v) => onChange(pcs.id, 'maxIscTotal', v)} unit="A" disabled={!isCustom} />
 
               {/* Save Button for Custom PCS */}
               {isCustom && onSaveCustom && (
@@ -2079,7 +2080,8 @@
                 mpptMaxVoltage: '',
                 maxInputVoltage: '',
                 maxInputCurrentPerCircuit: '',
-                maxIscPerCircuit: ''
+                maxIscPerCircuit: '',
+                maxIscTotal: ''
             } : pcs));
         } else {
             const preset = pcsPresets.find(p => p.model === modelName);

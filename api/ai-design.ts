@@ -1,6 +1,7 @@
 import {
   computeDeterministicAiAssignments,
   convertAiAssignmentsToCircuitAssignments,
+  diagnoseUnusablePcs,
   summarizeAssignments,
   validateAiAssignments,
 } from '../src/logic/assignmentUtils';
@@ -43,67 +44,85 @@ function json(res: any, status: number, body: unknown) {
   res.send(JSON.stringify(body));
 }
 
-function isFiniteNumber(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value);
+// 数値 or 数値文字列("200"など)を number に変換。空・非数は NaN。
+function coerceNum(value: unknown): number {
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string' && value.trim() !== '') return Number(value);
+  return NaN;
 }
 
-function validateRequestShape(body: any): body is AiDesignRequest {
-  if (!body || typeof body !== 'object') {
-    return false;
-  }
+const PANEL_LABELS: Record<string, string> = {
+  voc: 'パネル Voc(開放電圧)',
+  vmp: 'パネル Vmp(動作電圧)',
+  isc: 'パネル Isc(短絡電流)',
+  imp: 'パネル Imp(動作電流)',
+  pmax: 'パネル Pmax(定格出力)',
+  tempCoeffVoc: 'パネル 温度係数(Voc)',
+  moduleCount: 'パネル総数',
+};
+const CONDITION_LABELS: Record<string, string> = {
+  minTemperature: '想定最低気温',
+  targetOverloadRatio: '目標過積載率',
+};
+const PCS_LABELS: Record<string, string> = {
+  ratedPower: '定格出力',
+  totalCircuits: '回路数',
+  mpptCount: 'MPPT数',
+  startupVoltage: '起動電圧',
+  mpptMinVoltage: 'MPPT下限電圧',
+  mpptMaxVoltage: 'MPPT上限電圧',
+  maxInputVoltage: '最大入力電圧',
+  maxInputCurrentPerCircuit: '最大入力電流/回路',
+  maxIscPerCircuit: '最大短絡電流/回路',
+  maxIscTotal: '最大短絡電流/PCS合計',
+};
 
+// 入力を検証しつつ数値へ正規化する。問題があれば「どの項目が原因か」を示すメッセージを返す（正常なら null）。
+function validateAndNormalize(body: any): string | null {
+  if (!body || typeof body !== 'object') return '入力データがありません。';
   if (!body.panel || !body.condition || !Array.isArray(body.pcsList) || !body.baselineResult) {
-    return false;
+    return 'パネル・設置条件・PCS・ベースライン結果のいずれかが不足しています。';
   }
-
   if (body.pcsList.length === 0 || body.pcsList.length > MAX_PCS_COUNT) {
-    return false;
-  }
-
-  const totalCircuits = body.pcsList.reduce(
-    (sum: number, pcs: any) => sum + (typeof pcs?.totalCircuits === 'number' ? pcs.totalCircuits : 0),
-    0
-  );
-
-  if (totalCircuits <= 0 || totalCircuits > MAX_TOTAL_CIRCUITS) {
-    return false;
+    return `PCSの台数が不正です（1〜${MAX_PCS_COUNT}台）。`;
   }
 
   const panel = body.panel;
   const condition = body.condition;
-  const panelNumbers = [
-    panel.voc,
-    panel.vmp,
-    panel.isc,
-    panel.imp,
-    panel.pmax,
-    panel.tempCoeffVoc,
-    panel.tempCoeffIsc,
-    panel.moduleCount,
-    condition.minTemperature,
-    condition.targetOverloadRatio,
-  ];
 
-  if (!panelNumbers.every(isFiniteNumber)) {
-    return false;
+  for (const key of Object.keys(PANEL_LABELS)) {
+    const n = coerceNum(panel[key]);
+    if (!Number.isFinite(n)) return `${PANEL_LABELS[key]} の値を入力してください。`;
+    panel[key] = n;
+  }
+  // tempCoeffIsc はサーバーの割付計算では未使用。未入力なら 0 とみなす。
+  panel.tempCoeffIsc = Number.isFinite(coerceNum(panel.tempCoeffIsc)) ? coerceNum(panel.tempCoeffIsc) : 0;
+
+  for (const key of Object.keys(CONDITION_LABELS)) {
+    const n = coerceNum(condition[key]);
+    if (!Number.isFinite(n)) return `${CONDITION_LABELS[key]} の値を入力してください。`;
+    condition[key] = n;
   }
 
-  return body.pcsList.every((pcs: any) =>
-    pcs &&
-    typeof pcs.id === 'string' &&
-    [
-      pcs.ratedPower,
-      pcs.totalCircuits,
-      pcs.mpptCount,
-      pcs.startupVoltage,
-      pcs.mpptMinVoltage,
-      pcs.mpptMaxVoltage,
-      pcs.maxInputVoltage,
-      pcs.maxInputCurrentPerCircuit,
-      pcs.maxIscPerCircuit,
-      pcs.maxIscTotal,
-    ].every(isFiniteNumber)
-  );
+  let totalCircuits = 0;
+  for (const pcs of body.pcsList) {
+    if (!pcs || typeof pcs.id !== 'string') return 'PCSのIDが不正です。';
+    for (const key of Object.keys(PCS_LABELS)) {
+      const n = coerceNum(pcs[key]);
+      if (!Number.isFinite(n)) return `${pcs.id} の「${PCS_LABELS[key]}」を入力してください。`;
+      if ((key === 'maxIscTotal' || key === 'totalCircuits' || key === 'ratedPower') && n <= 0) {
+        return `${pcs.id} の「${PCS_LABELS[key]}」は0より大きい値を入力してください。`;
+      }
+      pcs[key] = n;
+    }
+    totalCircuits += pcs.totalCircuits;
+  }
+
+  if (totalCircuits <= 0 || totalCircuits > MAX_TOTAL_CIRCUITS) {
+    return `回路数の合計が不正です（1〜${MAX_TOTAL_CIRCUITS}）。`;
+  }
+
+  return null;
 }
 
 function extractOutputText(responsePayload: any): string | null {
@@ -285,13 +304,23 @@ export default async function handler(req: any, res: any) {
         })()
       : req.body;
 
-  if (!validateRequestShape(body)) {
-    return json(res, 400, { error: '入力データが不正です。' });
+  const validationError = validateAndNormalize(body);
+  if (validationError) {
+    return json(res, 400, { error: validationError });
   }
 
   try {
     // 1. 割付は決定アルゴリズムで確定（全パネル配置・制約遵守）
     const assignments = computeDeterministicAiAssignments(body.panel, body.pcsList, body.condition);
+
+    // 1b. 1枚も割り付けられない場合は理由を明示して返す
+    if (assignments.length === 0) {
+      const reasons = diagnoseUnusablePcs(body.panel, body.pcsList, body.condition);
+      return json(res, 422, {
+        error: 'この構成では有効な回路割付ができませんでした。パネルとPCSの仕様（電流・電圧の上限）をご確認ください。',
+        details: reasons.length > 0 ? reasons : ['すべてのPCSで割付可能な回路がありませんでした。'],
+      });
+    }
 
     // 2. 念のため制約検証
     const validationErrors = validateAiAssignments(
