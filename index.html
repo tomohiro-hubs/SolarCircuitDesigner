@@ -1905,7 +1905,7 @@
       manufacturer: '', model: '', voc: '', vmp: '', isc: '', imp: '', pmax: '', tempCoeffVoc: '', tempCoeffIsc: '', tempCoeffPmax: '', moduleCount: ''
     };
     const INITIAL_PCS = {
-      id: 'PCS1', manufacturer: '', model: '', ratedPower: '', totalCircuits: '', mpptCount: '', startupVoltage: '', mpptMinVoltage: '', mpptMaxVoltage: '', maxInputVoltage: '', maxInputCurrentPerCircuit: '', maxIscPerCircuit: '', maxIscTotal: '', efficiency: ''
+      id: 'PCS1', manufacturer: '', model: '', ratedPower: '', totalCircuits: '', mpptCount: '', ratedInputVoltage: '', startupVoltage: '', mpptMinVoltage: '', mpptMaxVoltage: '', maxInputVoltage: '', maxInputCurrentPerCircuit: '', maxIscPerCircuit: '', maxIscTotal: '', efficiency: ''
     };
     const INITIAL_CONDITION = {
       minTemperature: -10, targetOverloadRatio: 145, manualSeriesCount: 0
@@ -1979,6 +1979,7 @@
       const [aiSuggestion, setAiSuggestion] = useState(null);
       const [aiStatus, setAiStatus] = useState('idle');
       const [aiErrorMessage, setAiErrorMessage] = useState('');
+      const [aiVoltagePref, setAiVoltagePref] = useState('normal');
       const [appliedBy, setAppliedBy] = useState('rule');
 
       const handlePanelChange = useCallback((field, value) => setPanel(prev => ({ ...prev, [field]: value })), []);
@@ -2075,6 +2076,7 @@
                 efficiency: '',
                 totalCircuits: '',
                 mpptCount: '',
+                ratedInputVoltage: '',
                 startupVoltage: '',
                 mpptMinVoltage: '',
                 mpptMaxVoltage: '',
@@ -2358,9 +2360,12 @@
           };
       }, [result, manualAssignments, panel, pcsList, condition.targetOverloadRatio]);
 
-      const handleAiDesign = useCallback(async () => {
+      const handleAiDesign = useCallback(async (voltagePreference = 'normal', autoApply = false) => {
+        // ボタンのonClickはイベントを渡すため、正規化する
+        const pref = (voltagePreference === 'high' || voltagePreference === 'low') ? voltagePreference : 'normal';
         setAiStatus('loading');
         setAiErrorMessage('');
+        setAiVoltagePref(pref);
 
         try {
           const baselineResult = finalResult || result || calculateDesign(panel, pcsList, condition, spotCondition);
@@ -2378,7 +2383,8 @@
               panel,
               pcsList,
               condition,
-              baselineResult
+              baselineResult,
+              voltagePreference: pref
             })
           });
 
@@ -2392,12 +2398,22 @@
 
           setAiSuggestion(payload.suggestion);
           setAiStatus('success');
+
+          if (autoApply) {
+            // 電圧再検討ボタンからの再計算は即反映して比較しやすくする
+            const nextAssignments = buildAssignmentsFromAiSuggestion(payload.suggestion);
+            setManualAssignments(nextAssignments);
+            setAppliedBy('ai');
+          } else {
+            // 新しい提案を出したら「適用済み」状態はいったん解除
+            setAppliedBy(prev => (prev === 'ai' ? 'rule' : prev));
+          }
         } catch (error) {
           console.error(error);
           setAiStatus('error');
           setAiErrorMessage(error instanceof Error ? error.message : 'AI自動設計の取得に失敗しました。');
         }
-      }, [condition, finalResult, panel, pcsList, result, spotCondition]);
+      }, [condition, finalResult, panel, pcsList, result, spotCondition, buildAssignmentsFromAiSuggestion]);
 
       return (
         <div className="min-h-screen flex flex-col">
@@ -2607,6 +2623,40 @@
                       <div className="space-y-4">
                         <div className="rounded-lg bg-slate-50 border border-slate-200 p-4">
                           <p className="text-sm leading-6 text-slate-700">{aiSuggestion.summary}</p>
+                        </div>
+
+                        {/* 電圧調整で再検討 */}
+                        <div className="rounded-lg border border-cyan-200 bg-cyan-50/50 p-4">
+                          <div className="flex items-center gap-2 mb-1">
+                            <i className="fa-solid fa-sliders text-cyan-600"></i>
+                            <h3 className="text-sm font-bold text-slate-700">電圧の狙いを変えて再検討</h3>
+                          </div>
+                          <p className="text-xs text-slate-500 mb-3">結果を見て、ストリングの直列枚数（電圧）を調整して再計算できます。</p>
+                          <div className="grid grid-cols-3 gap-2">
+                            {[
+                              { key: 'low', label: '電圧低め', sub: '直列少なめ' },
+                              { key: 'normal', label: '電圧普通', sub: '推奨・再検討' },
+                              { key: 'high', label: '電圧高め', sub: '直列多め' },
+                            ].map(opt => (
+                              <button
+                                key={opt.key}
+                                onClick={() => handleAiDesign(opt.key, true)}
+                                disabled={aiStatus === 'loading'}
+                                className={`px-3 py-2 rounded-lg text-sm font-bold border transition-all disabled:opacity-60 disabled:cursor-not-allowed ${aiVoltagePref === opt.key ? 'bg-cyan-600 text-white border-cyan-600 shadow' : 'bg-white text-slate-700 border-slate-300 hover:border-cyan-400 hover:bg-cyan-50'}`}
+                                title={opt.sub}
+                              >
+                                {aiStatus === 'loading' && aiVoltagePref === opt.key ? (
+                                  <><i className="fa-solid fa-spinner fa-spin mr-1"></i>計算中</>
+                                ) : (
+                                  <>
+                                    <div>{opt.label}</div>
+                                    <div className={`text-[10px] font-normal ${aiVoltagePref === opt.key ? 'text-cyan-100' : 'text-slate-400'}`}>{opt.sub}</div>
+                                  </>
+                                )}
+                              </button>
+                            ))}
+                          </div>
+                          <p className="text-[11px] text-slate-400 mt-2">※ 電圧高めは回路に空きが出ることがあります（適正範囲内で調整）。電圧低めは推奨直列の下限付近を狙います。</p>
                         </div>
 
                         {aiSuggestion.reasoning && aiSuggestion.reasoning.length > 0 ? (

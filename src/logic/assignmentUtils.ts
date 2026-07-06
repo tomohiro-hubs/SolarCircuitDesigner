@@ -17,6 +17,9 @@ import {
 // 禁則: 1〜2枚の直列構成は電圧設計上不適切なため許可しない（3枚以上を必須とする）。
 export const MIN_SERIES_MODULES = 3;
 
+// AI再検討時の電圧の狙い: high=直列多め(高電圧・空き増)/ low=直列少なめ(低電圧)/ normal=均衡
+export type VoltagePreference = 'high' | 'normal' | 'low';
+
 function getCircuitsPerMppt(pcs: PcsSpec): number {
   return Math.max(1, Math.ceil(pcs.totalCircuits / Math.max(pcs.mpptCount, 1)));
 }
@@ -139,7 +142,12 @@ export function diagnoseUnusablePcs(
  * 「MPPTは2回路1組で直列数を揃える／各回路は[nMin,nMax]／1〜2枚構成なし」という
  * 制約下で回路へ配分する。戻り値は circuitIndex(1始まり) → seriesModules。
  */
-function fillPcs(info: PcsPlanInfo, budget: number): Map<number, number> {
+function fillPcs(
+  info: PcsPlanInfo,
+  budget: number,
+  targetSeries: number,
+  preference: VoltagePreference = 'normal'
+): Map<number, number> {
   const result = new Map<number, number>();
   const { nMin, nMax, usableCircuits } = info;
 
@@ -149,9 +157,19 @@ function fillPcs(info: PcsPlanInfo, budget: number): Map<number, number> {
 
   const M = Math.min(budget, usableCircuits * nMax);
 
-  // 使用回路数 c: 各回路が nMin 以上になる範囲でできるだけ多くの回路に分散する
-  // （電流を分散し、MPPTを均等に使うため）。
-  const c = Math.min(usableCircuits, Math.floor(M / nMin));
+  // 使用回路数 c を「狙い直列数 targetSeries」から逆算する。
+  // c を増やすほど各回路の直列数(=電圧)は下がり、減らすほど上がる。
+  const sTarget = Math.min(Math.max(targetSeries, nMin), nMax);
+  const minCircuitsByMax = Math.ceil(M / nMax); // これ未満だと直列が nMax を超える
+  const maxCircuitsByMin = Math.min(usableCircuits, Math.floor(M / nMin)); // これ超で直列が nMin 未満
+  let c = Math.min(Math.max(Math.round(M / sTarget), minCircuitsByMax), maxCircuitsByMin);
+
+  if (preference === 'high') {
+    // 高電圧: 直列最大 → 回路は最少。ただし空きを作りすぎないよう最低でも半数は使う。
+    c = Math.max(c, Math.min(Math.ceil(usableCircuits / 2), maxCircuitsByMin));
+  }
+
+  c = Math.max(1, Math.min(c, usableCircuits));
   if (c < 1) {
     return result;
   }
@@ -192,14 +210,30 @@ function fillPcs(info: PcsPlanInfo, budget: number): Map<number, number> {
 export function computeDeterministicAiAssignments(
   panel: PanelSpec,
   pcsList: PcsSpec[],
-  condition: SiteCondition
+  condition: SiteCondition,
+  voltagePreference: VoltagePreference = 'normal'
 ): AiAssignment[] {
   const infos = buildPcsPlanInfo(panel, pcsList, condition);
   const targetRatio = condition.targetOverloadRatio > 0 ? condition.targetOverloadRatio / 100 : 1.45;
 
   const evenFloor = (x: number) => x - (x % 2);
+  const clamp = (v: number, lo: number, hi: number) => Math.min(Math.max(v, lo), hi);
+
+  // 各PCSの狙い直列数（電圧プリファレンス別）。
+  // 推奨直列は定格入力電圧付近（≒アプリの「推奨ベストゾーン」）を基準にする。
+  const targetSeriesFor = (info: PcsPlanInfo): number => {
+    const vmp = panel.vmp > 0 ? panel.vmp : 1;
+    const vRated =
+      info.pcs.ratedInputVoltage && info.pcs.ratedInputVoltage > 0
+        ? info.pcs.ratedInputVoltage
+        : info.pcs.maxInputVoltage * 0.7; // 定格未指定時のフォールバック
+    if (voltagePreference === 'high') return info.nMax; // 高め: 直列最大（空きが出る）
+    if (voltagePreference === 'low') return clamp(Math.round((0.9 * vRated) / vmp), info.nMin, info.nMax); // 低め: 推奨下限付近
+    return clamp(Math.round(vRated / vmp), info.nMin, info.nMax); // 普通: 定格付近（推奨）
+  };
 
   // 各PCSの最大収容枚数（ペア単位で扱うため偶数に丸める）と全体の配置可能枚数
+  // 全モードとも収容上限は nMax（全パネルを配置できるようにする）。
   const maxModules = infos.map((info) => info.usableCircuits * info.nMax);
   const evenMax = maxModules.map(evenFloor);
   const totalCapacity = evenMax.reduce((a, b) => a + b, 0);
@@ -249,7 +283,7 @@ export function computeDeterministicAiAssignments(
   let placedTotal = 0;
 
   infos.forEach((info, i) => {
-    const filled = fillPcs(info, budgets[i]);
+    const filled = fillPcs(info, budgets[i], targetSeriesFor(info), voltagePreference);
     for (const [circuitIndex, seriesModules] of filled) {
       assignments.push({ pcsId: info.pcs.id, circuitIndex, seriesModules });
       placedTotal += seriesModules;

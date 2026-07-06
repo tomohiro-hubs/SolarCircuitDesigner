@@ -309,9 +309,20 @@ export default async function handler(req: any, res: any) {
     return json(res, 400, { error: validationError });
   }
 
+  // 電圧の狙い（再検討ボタン用）: 'high' | 'normal' | 'low'。既定は 'normal'。
+  const voltagePreference: 'high' | 'normal' | 'low' =
+    body.voltagePreference === 'high' || body.voltagePreference === 'low'
+      ? body.voltagePreference
+      : 'normal';
+
   try {
     // 1. 割付は決定アルゴリズムで確定（全パネル配置・制約遵守）
-    const assignments = computeDeterministicAiAssignments(body.panel, body.pcsList, body.condition);
+    const assignments = computeDeterministicAiAssignments(
+      body.panel,
+      body.pcsList,
+      body.condition,
+      voltagePreference
+    );
 
     // 1b. 1枚も割り付けられない場合は理由を明示して返す
     if (assignments.length === 0) {
@@ -355,6 +366,7 @@ export default async function handler(req: any, res: any) {
     return json(res, 200, {
       suggestion: { ...commentary, assignments },
       model: DEFAULT_MODEL,
+      voltagePreference,
     });
   } catch (error) {
     if (error instanceof Error && error.name === 'AbortError') {

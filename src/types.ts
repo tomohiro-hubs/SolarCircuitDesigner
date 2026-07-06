@@ -18,6 +18,7 @@ export type PcsSpec = {
   ratedPower: number;   // 定格容量 [W]
   totalCircuits: number;
   mpptCount: number;    // MPPTの数
+  ratedInputVoltage?: number; // 定格入力電圧 [V]（推奨直列数の基準）
   startupVoltage: number;   // 起動電圧 [V]
   mpptMinVoltage: number;   // MPPT動作下限 [V]
   mpptMaxVoltage: number;   // MPPT動作上限 [V]
