@@ -844,14 +844,14 @@
     };
 
     // --- PCS List Form (Updated) ---
-    const PcsListForm = ({ pcsList, onAdd, onBulkAdd, onRemove, onChange, onPresetSelect }) => {
+    const PcsListForm = ({ pcsList, onAdd, onBulkAdd, onRemove, onChange, onPresetSelect, presets = PCS_PRESETS, onSaveCustom }) => {
       const [bulkCount, setBulkCount] = useState(1);
 
       return (
       <section className="space-y-4">
         {pcsList.map((pcs, index) => {
-           // Check if current model matches a preset
-           const isCustom = !PCS_PRESETS.some(p => p.model === pcs.model);
+           // Check if current model matches a preset (default or custom saved)
+           const isCustom = !presets.some(p => p.model === pcs.model);
            
            return (
           <div key={pcs.id} className="bg-white rounded-xl p-6 shadow-sm border border-slate-200 relative group">
@@ -877,7 +877,7 @@
                 onChange={(e) => onPresetSelect(pcs.id, e.target.value)}
               >
                 <option value="" disabled>モデルを選択してください</option>
-                {PCS_PRESETS.map(p => (
+                {presets.map(p => (
                   <option key={p.model} value={p.model}>{p.manufacturer} | {p.model} ({p.ratedPower/1000}kW)</option>
                 ))}
                 <option value="CUSTOM">カスタム (手動入力)</option>
@@ -900,6 +900,20 @@
               <InputField label="最大入力電圧" value={pcs.maxInputVoltage} onChange={(v) => onChange(pcs.id, 'maxInputVoltage', v)} unit="V" disabled={!isCustom} />
               <InputField label="最大入力電流/回路" value={pcs.maxInputCurrentPerCircuit} onChange={(v) => onChange(pcs.id, 'maxInputCurrentPerCircuit', v)} unit="A" disabled={!isCustom} />
               <InputField label="最大短絡電流/回路" value={pcs.maxIscPerCircuit} onChange={(v) => onChange(pcs.id, 'maxIscPerCircuit', v)} unit="A" disabled={!isCustom} />
+
+              {/* Save Button for Custom PCS */}
+              {isCustom && onSaveCustom && (
+                <div className="flex items-end">
+                  <button
+                    onClick={() => onSaveCustom(pcs.id)}
+                    className="h-[42px] w-full bg-indigo-50 text-indigo-600 border border-indigo-200 rounded-lg font-bold text-xs hover:bg-indigo-100 transition-colors flex items-center justify-center gap-1"
+                    title="入力した内容をブラウザに保存します"
+                  >
+                    <i className="fa-solid fa-save"></i>
+                    プリセット保存
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         );})}
@@ -1901,6 +1915,7 @@
       const rightPanelRef = useRef(null);
       const [projectName, setProjectName] = useState('');
       const [panelPresets, setPanelPresets] = useState([]);
+      const [pcsPresets, setPcsPresets] = useState(PCS_PRESETS);
       const [panel, setPanel] = useState(INITIAL_PANEL);
       
       const [spotCondition, setSpotCondition] = useState({
@@ -1913,6 +1928,14 @@
         const stored = localStorage.getItem('customPanelPresets');
         const customs = stored ? JSON.parse(stored) : [];
         setPanelPresets([...DEFAULT_PANEL_PRESETS, ...customs]);
+
+        try {
+          const storedPcs = localStorage.getItem('customPcsPresets');
+          const pcsCustoms = storedPcs ? JSON.parse(storedPcs) : [];
+          setPcsPresets([...PCS_PRESETS, ...pcsCustoms]);
+        } catch (e) {
+          setPcsPresets(PCS_PRESETS);
+        }
       }, []);
 
       const handleSaveCustomPanel = useCallback(() => {
@@ -2059,12 +2082,57 @@
                 maxIscPerCircuit: ''
             } : pcs));
         } else {
-            const preset = PCS_PRESETS.find(p => p.model === modelName);
+            const preset = pcsPresets.find(p => p.model === modelName);
             if (preset) {
                 setPcsList(prev => prev.map(pcs => pcs.id === id ? { ...pcs, ...preset } : pcs));
             }
         }
-      }, []);
+      }, [pcsPresets]);
+
+      // カスタム入力したPCSをブラウザにプリセット保存する
+      const handleSaveCustomPcs = useCallback((id) => {
+        const pcs = pcsList.find(p => p.id === id);
+        if (!pcs) return;
+        if (!pcs.manufacturer || !pcs.model) {
+          alert('保存するにはメーカーと型式を入力してください');
+          return;
+        }
+        const num = (v) => (v === '' || v === null || v === undefined ? v : Number(v));
+        const newPreset = {
+          manufacturer: pcs.manufacturer,
+          model: pcs.model,
+          ratedPower: num(pcs.ratedPower),
+          totalCircuits: num(pcs.totalCircuits),
+          mpptCount: num(pcs.mpptCount),
+          ratedInputVoltage: num(pcs.ratedInputVoltage),
+          startupVoltage: num(pcs.startupVoltage),
+          maxInputVoltage: num(pcs.maxInputVoltage),
+          mpptMinVoltage: num(pcs.mpptMinVoltage),
+          mpptMaxVoltage: num(pcs.mpptMaxVoltage),
+          maxInputCurrentPerCircuit: num(pcs.maxInputCurrentPerCircuit),
+          maxIscPerCircuit: num(pcs.maxIscPerCircuit),
+          maxIscTotal: num(pcs.maxIscTotal),
+          efficiency: num(pcs.efficiency)
+        };
+
+        let customs = [];
+        try {
+          const stored = localStorage.getItem('customPcsPresets');
+          customs = stored ? JSON.parse(stored) : [];
+        } catch (e) { customs = []; }
+
+        // 同一型式は上書き。既定プリセットと同名の場合は保存不可。
+        if (PCS_PRESETS.some(p => p.model === newPreset.model)) {
+          alert(`「${newPreset.model}」は既定プリセットと同じ型式名です。別の型式名にしてください`);
+          return;
+        }
+        const filtered = customs.filter(p => p.model !== newPreset.model);
+        const updatedCustoms = [...filtered, newPreset];
+
+        localStorage.setItem('customPcsPresets', JSON.stringify(updatedCustoms));
+        setPcsPresets([...PCS_PRESETS, ...updatedCustoms]);
+        alert(`カスタムPCS「${newPreset.model}」をブラウザに保存しました`);
+      }, [pcsList]);
 
       const handleCalculate = () => {
         setIsCalculating(true);
@@ -2464,13 +2532,15 @@
                     )}
                   </button>
   
-                  <PcsListForm 
-                    pcsList={pcsList} 
-                    onAdd={handleAddPcs} 
+                  <PcsListForm
+                    pcsList={pcsList}
+                    onAdd={handleAddPcs}
                     onBulkAdd={handleBulkAddPcs}
-                    onRemove={handleRemovePcs} 
-                    onChange={handlePcsChange} 
+                    onRemove={handleRemovePcs}
+                    onChange={handlePcsChange}
                     onPresetSelect={handlePcsPresetSelect}
+                    presets={pcsPresets}
+                    onSaveCustom={handleSaveCustomPcs}
                   />
                   {/* Old ConditionForm Removed */}
                   
