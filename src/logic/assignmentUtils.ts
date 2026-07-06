@@ -204,11 +204,17 @@ export function computeDeterministicAiAssignments(
   // 端数を1台に押し付けず、過積載率のばらつきを最小化する。端数(±1)はペアで詰められないため残す。
   const balance = (target: number) => {
     let remaining = target - budgets.reduce((a, b) => a + b, 0);
+    // 増やす時は先頭PCSから、減らす時は末尾PCSから回す。
+    // これにより「端数(14直列)は後ろのPCSに寄り、前のPCSは満載で揃う」ようになる。
+    const order = Array.from({ length: infos.length }, (_, i) => i);
+    if (remaining < 0) order.reverse();
+
     let guard = 0;
     while (Math.abs(remaining) >= 2 && guard < 10000000) {
       guard += 1;
       let moved = false;
-      for (let i = 0; i < infos.length && Math.abs(remaining) >= 2; i += 1) {
+      for (const i of order) {
+        if (Math.abs(remaining) < 2) break;
         if (infos[i].usableCircuits < 1) continue;
         if (remaining >= 2 && budgets[i] <= evenMax[i] - 2) {
           budgets[i] += 2;
