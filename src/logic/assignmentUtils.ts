@@ -79,6 +79,244 @@ export function convertAiAssignmentsToCircuitAssignments(
   });
 }
 
+type PcsPlanInfo = {
+  pcs: PcsSpec;
+  nMin: number;
+  nMax: number;
+  usableCircuits: number; // 電流制約・回路数から使用可能な回路数（MPPTは2回路1組前提）
+  reason?: string;        // 使用不可の理由
+};
+
+function buildPcsPlanInfo(
+  panel: PanelSpec,
+  pcsList: PcsSpec[],
+  condition: SiteCondition
+): PcsPlanInfo[] {
+  const vocCold = calculateVocCold(panel, condition.minTemperature);
+
+  return pcsList.map((pcs) => {
+    const range = calculateAllowedSeriesRange(panel, pcs, vocCold);
+
+    if (range.error) {
+      return { pcs, nMin: 0, nMax: 0, usableCircuits: 0, reason: range.error };
+    }
+    if (panel.imp > pcs.maxInputCurrentPerCircuit) {
+      return { pcs, nMin: 0, nMax: 0, usableCircuits: 0, reason: `${pcs.id}: 回路電流(${panel.imp}A)が上限(${pcs.maxInputCurrentPerCircuit}A)超過` };
+    }
+    if (panel.isc > pcs.maxIscPerCircuit) {
+      return { pcs, nMin: 0, nMax: 0, usableCircuits: 0, reason: `${pcs.id}: 回路短絡電流(${panel.isc}A)が上限(${pcs.maxIscPerCircuit}A)超過` };
+    }
+
+    const nMin = Math.max(range.min, MIN_SERIES_MODULES);
+    const nMax = range.max;
+    if (nMin > nMax) {
+      return { pcs, nMin: 0, nMax: 0, usableCircuits: 0, reason: `${pcs.id}: 直列許容範囲が成立しません` };
+    }
+
+    // PCS合計短絡電流の制約から使用できる回路数の上限
+    const maxCircuitsByIsc = panel.isc > 0 ? Math.floor(pcs.maxIscTotal / panel.isc) : pcs.totalCircuits;
+    const usableCircuits = Math.max(0, Math.min(pcs.totalCircuits, maxCircuitsByIsc));
+
+    return { pcs, nMin, nMax, usableCircuits };
+  });
+}
+
+/**
+ * 1つのPCSに対し、割り当てたいモジュール数(budget)を
+ * 「MPPTは2回路1組で直列数を揃える／各回路は[nMin,nMax]／1〜2枚構成なし」という
+ * 制約下で回路へ配分する。戻り値は circuitIndex(1始まり) → seriesModules。
+ */
+function fillPcs(info: PcsPlanInfo, budget: number): Map<number, number> {
+  const result = new Map<number, number>();
+  const { nMin, nMax, usableCircuits } = info;
+
+  if (usableCircuits < 1 || budget < nMin || nMax < nMin) {
+    return result;
+  }
+
+  let budgetLeft = Math.min(budget, usableCircuits * nMax);
+  let circuitIndex = 1;
+  let circuitsRemaining = usableCircuits;
+
+  // MPPTペア（連続2回路）単位で、直列数を揃えながら配分する。
+  while (circuitsRemaining >= 2 && budgetLeft >= nMin) {
+    if (budgetLeft < 2 * nMin) {
+      // ペアを組めるだけの残枚数がない → 1回路だけ使う（ペア均等制約は非適用）
+      const s = Math.min(Math.max(budgetLeft, nMin), nMax);
+      result.set(circuitIndex, s);
+      budgetLeft -= s;
+      break;
+    }
+
+    // このペアの1回路あたり直列数（残りを均等に広げつつ範囲内にクランプ）
+    let s = Math.round(budgetLeft / circuitsRemaining);
+    s = Math.min(s, Math.floor(budgetLeft / 2)); // ペア(2回路)で予算を超えない
+    s = Math.min(Math.max(s, nMin), nMax);
+
+    result.set(circuitIndex, s);
+    result.set(circuitIndex + 1, s);
+    budgetLeft -= 2 * s;
+    circuitIndex += 2;
+    circuitsRemaining -= 2;
+  }
+
+  // 端数の単独回路（usableCircuitsが奇数）に、残枚数があれば1回路だけ配置
+  if (circuitsRemaining === 1 && budgetLeft >= nMin) {
+    const s = Math.min(Math.max(budgetLeft, nMin), nMax);
+    result.set(circuitIndex, s);
+    budgetLeft -= s;
+  }
+
+  return result;
+}
+
+/**
+ * 決定的な回路割付を計算する。
+ * - 全パネルを可能な限り割り付け（残枚数を最小化）
+ * - 過積載率が目標(condition.targetOverloadRatio)付近になるようPCS間を配分
+ * - MPPTは2回路1組で直列数を揃える／各回路は許容直列数の範囲内／1〜2枚構成は作らない
+ */
+export function computeDeterministicAiAssignments(
+  panel: PanelSpec,
+  pcsList: PcsSpec[],
+  condition: SiteCondition
+): AiAssignment[] {
+  const infos = buildPcsPlanInfo(panel, pcsList, condition);
+  const targetRatio = condition.targetOverloadRatio > 0 ? condition.targetOverloadRatio / 100 : 1.45;
+
+  // 各PCSの最大収容枚数と、目標過積載率での希望枚数
+  const maxModules = infos.map((info) => info.usableCircuits * info.nMax);
+  const totalCapacity = maxModules.reduce((a, b) => a + b, 0);
+  const placeableTotal = Math.min(panel.moduleCount, totalCapacity);
+
+  // 初期配分: 目標過積載率での希望枚数（各PCS上限でクランプ）
+  const budgets = infos.map((info, i) => {
+    if (info.usableCircuits < 1) return 0;
+    const desired = panel.pmax > 0 ? Math.round((info.pcs.ratedPower * targetRatio) / panel.pmax) : maxModules[i];
+    return Math.min(desired, maxModules[i]);
+  });
+
+  // 残枚数(placeableTotal)に合わせて配分を増減する
+  const adjust = (delta: number) => {
+    // delta>0: 増やす（headroomのあるPCSへ）／delta<0: 減らす
+    let remaining = delta;
+    // 決定的にするため index 昇順で回す
+    let guard = 0;
+    while (remaining !== 0 && guard < 100000) {
+      guard += 1;
+      let moved = false;
+      for (let i = 0; i < infos.length && remaining !== 0; i += 1) {
+        if (infos[i].usableCircuits < 1) continue;
+        if (remaining > 0 && budgets[i] < maxModules[i]) {
+          const step = Math.min(remaining, maxModules[i] - budgets[i]);
+          budgets[i] += step;
+          remaining -= step;
+          moved = true;
+        } else if (remaining < 0 && budgets[i] > 0) {
+          const step = Math.min(-remaining, budgets[i]);
+          budgets[i] -= step;
+          remaining += step;
+          moved = true;
+        }
+      }
+      if (!moved) break;
+    }
+  };
+
+  const budgetSum = budgets.reduce((a, b) => a + b, 0);
+  adjust(placeableTotal - budgetSum);
+
+  // 各PCSを配分に従って埋め、端数はさらに詰める
+  const assignments: AiAssignment[] = [];
+  let placedTotal = 0;
+
+  infos.forEach((info, i) => {
+    const filled = fillPcs(info, budgets[i]);
+    for (const [circuitIndex, seriesModules] of filled) {
+      assignments.push({ pcsId: info.pcs.id, circuitIndex, seriesModules });
+      placedTotal += seriesModules;
+    }
+  });
+
+  // まだ残枚数がある場合、余力のあるPCSの直列数/回路を増やして詰める（決定的）
+  let leftover = placeableTotal - placedTotal;
+  if (leftover > 0) {
+    // 既存割付を circuitIndex 昇順で辿り、nMax まで引き上げる。
+    // ただしMPPTペアは揃える必要があるので、同一ペアは同時に+1する。
+    const byPcs = new Map<string, Map<number, number>>();
+    assignments.forEach((a) => {
+      if (!byPcs.has(a.pcsId)) byPcs.set(a.pcsId, new Map());
+      byPcs.get(a.pcsId)!.set(a.circuitIndex, a.seriesModules);
+    });
+
+    let guard = 0;
+    while (leftover > 0 && guard < 1000000) {
+      guard += 1;
+      let progressed = false;
+
+      for (const info of infos) {
+        if (leftover <= 0) break;
+        if (info.usableCircuits < 1) continue;
+        const map = byPcs.get(info.pcs.id);
+        if (!map) continue;
+
+        // ペア単位(odd/even circuit)で +1 を試みる
+        for (let ci = 1; ci <= info.usableCircuits && leftover > 0; ci += 2) {
+          const isPair = ci + 1 <= info.usableCircuits;
+          const a = map.get(ci) ?? 0;
+          const b = isPair ? (map.get(ci + 1) ?? 0) : 0;
+
+          if (isPair) {
+            // 両回路とも使用中かつ同値で nMax 未満なら +1 ずつ（2枚消費）
+            if (a > 0 && a === b && a < info.nMax && leftover >= 2) {
+              map.set(ci, a + 1);
+              map.set(ci + 1, b + 1);
+              leftover -= 2;
+              progressed = true;
+            } else if (a === 0 && b === 0 && leftover >= 2 * info.nMin) {
+              // 未使用ペアを新規に nMin で起こす
+              map.set(ci, info.nMin);
+              map.set(ci + 1, info.nMin);
+              leftover -= 2 * info.nMin;
+              progressed = true;
+            }
+          } else {
+            // 端数の単独回路
+            if (a > 0 && a < info.nMax && leftover >= 1) {
+              map.set(ci, a + 1);
+              leftover -= 1;
+              progressed = true;
+            } else if (a === 0 && leftover >= info.nMin) {
+              map.set(ci, info.nMin);
+              leftover -= info.nMin;
+              progressed = true;
+            }
+          }
+        }
+      }
+
+      if (!progressed) break;
+    }
+
+    // byPcs を assignments に反映し直す
+    assignments.length = 0;
+    for (const [pcsId, map] of byPcs) {
+      for (const [circuitIndex, seriesModules] of map) {
+        if (seriesModules > 0) {
+          assignments.push({ pcsId, circuitIndex, seriesModules });
+        }
+      }
+    }
+  }
+
+  // circuitIndex 昇順で安定ソート
+  assignments.sort((x, y) =>
+    x.pcsId === y.pcsId ? x.circuitIndex - y.circuitIndex : x.pcsId < y.pcsId ? -1 : 1
+  );
+
+  return assignments;
+}
+
 export function summarizeAssignments(
   panel: PanelSpec,
   pcsList: PcsSpec[],

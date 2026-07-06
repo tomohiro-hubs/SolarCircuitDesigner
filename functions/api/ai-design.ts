@@ -1,6 +1,10 @@
-import { validateAiAssignments } from '../../src/logic/assignmentUtils';
-import { calculateAllowedSeriesRange, calculateVocCold } from '../../src/logic/stringDesign';
-import { AiAssignment, AiDesignRequest } from '../../src/types';
+import {
+  computeDeterministicAiAssignments,
+  convertAiAssignmentsToCircuitAssignments,
+  summarizeAssignments,
+  validateAiAssignments,
+} from '../../src/logic/assignmentUtils';
+import { AiDesignRequest, DesignResult } from '../../src/types';
 
 interface Env {
   GEMINI_API_KEY: string;
@@ -13,10 +17,11 @@ const REQUEST_TIMEOUT_MS = 60000;
 const MAX_PCS_COUNT = 12;
 const MAX_TOTAL_CIRCUITS = 256;
 
+// 割付はサーバー側の決定アルゴリズムが行い、AIは「考察・注意点」の文章だけを担当する。
 // Gemini の responseSchema は OpenAPI サブセット。additionalProperties は非対応なので付けない。
-const suggestionSchema = {
+const commentarySchema = {
   type: 'object',
-  required: ['summary', 'reasoning', 'warnings', 'assignments'],
+  required: ['summary', 'reasoning', 'warnings'],
   properties: {
     summary: { type: 'string' },
     reasoning: {
@@ -26,18 +31,6 @@ const suggestionSchema = {
     warnings: {
       type: 'array',
       items: { type: 'string' },
-    },
-    assignments: {
-      type: 'array',
-      items: {
-        type: 'object',
-        required: ['pcsId', 'circuitIndex', 'seriesModules'],
-        properties: {
-          pcsId: { type: 'string' },
-          circuitIndex: { type: 'integer' },
-          seriesModules: { type: 'integer' },
-        },
-      },
     },
   },
 } as const;
@@ -146,77 +139,79 @@ function extractOutputText(responsePayload: any): string | null {
   return null;
 }
 
-function parseAssignments(rawAssignments: unknown): AiAssignment[] {
-  if (!Array.isArray(rawAssignments)) {
-    throw new Error('AIの割付データが不正です。');
-  }
+type Commentary = { summary: string; reasoning: string[]; warnings: string[] };
 
-  return rawAssignments.map((assignment) => {
-    if (!assignment || typeof assignment !== 'object') {
-      throw new Error('AIの割付データが不正です。');
-    }
-
-    const candidate = assignment as Record<string, unknown>;
-    if (
-      typeof candidate.pcsId !== 'string' ||
-      !Number.isInteger(candidate.circuitIndex) ||
-      !Number.isInteger(candidate.seriesModules)
-    ) {
-      throw new Error('AIの割付データが不正です。');
-    }
-
-    return {
-      pcsId: candidate.pcsId,
-      circuitIndex: candidate.circuitIndex as number,
-      seriesModules: candidate.seriesModules as number,
-    };
-  });
-}
-
-function buildPromptText(body: AiDesignRequest): string {
-  const { panel, pcsList, condition } = body;
-  const vocCold = calculateVocCold(panel, condition.minTemperature);
-
-  // 各PCSの「使える回路番号」と「許容直列数」を明示し、
-  // 割付表にそのまま入る形（pcsId・circuitIndex・seriesModules）で返させる。
-  const pcsGuides = pcsList
-    .map((pcs) => {
-      const range = calculateAllowedSeriesRange(panel, pcs, vocCold);
-      const rangeText = range.error
-        ? `設計不可（${range.error}）`
-        : `直列数は ${range.min}〜${range.max} 枚の整数`;
-      return `- pcsId="${pcs.id}": circuitIndex は 1〜${pcs.totalCircuits} の整数。${rangeText}。定格 ${pcs.ratedPower}W、MPPT数 ${pcs.mpptCount}。`;
-    })
-    .join('\n');
-
+// 決定アルゴリズムの割付結果(DesignResult)から、AIに渡す/フォールバックに使う統計テキストを作る。
+function buildDesignFacts(
+  body: AiDesignRequest,
+  result: DesignResult,
+  remainingModules: number
+): string {
+  const { panel, condition } = body;
+  const lines = result.summaries.map(
+    (s) =>
+      `- ${s.pcsId}: 使用回路${s.usedCircuits} / 割当${s.totalModulesAssigned}枚 / PV ${s.pvCapacityKw.toFixed(1)}kW / 過積載率 ${s.overloadRatio.toFixed(1)}%`
+  );
   return [
-    'あなたは太陽光発電所の回路設計を支援するエンジニアです。',
-    '目的: 各PCSの回路ごとに「直列モジュール数(seriesModules)」を決め、割付表を埋めること。',
-    '必ず安全側で判断し、既存の制約違反を起こさない割付だけを提案してください。',
-    'ベースライン結果を踏まえ、PCS間の配分・余りの扱い・過積載率のバランスを改善してください。',
-    '',
-    '【割付ルール（厳守）】',
-    `1. pcsId は次のいずれかを正確に使用する（新しいidを作らない）:\n${pcsGuides}`,
-    '2. circuitIndex は各PCSで 1 から始まる整数。範囲外や重複は禁止。',
-    '3. 各 seriesModules は上記の許容直列数の範囲内の整数にする。【禁則】1〜2枚の直列構成は禁止（使う回路は必ず3枚以上）。適切な電圧設計を維持するため、余り枚数の数合わせのために「1回路1枚」のような構成にしてはならない（許容範囲内に収められないなら、その回路は使わず空ける）。',
-    '4. MPPTは「2回路で1組」として扱う（circuitIndex の (1,2)(3,4)(5,6)… が同一MPPT）。同一MPPTに2回路とも入れる場合、その2回路の seriesModules は必ず同じ枚数にする。片側1回路だけ使う場合はこの制約は適用しない。',
-    `5. 目標過積載率は ${condition.targetOverloadRatio}%（概ね145%前後を目安）。各PCSでこの値にできるだけ近づけ、下回りすぎ・上回りすぎを避ける。`,
-    `6. パネル総数 ${panel.moduleCount} 枚を超えて割り当てない。余りが出ても電圧設計を崩す数合わせはしない。`,
-    '7. 選択されている各PCSの仕様（MPPT電圧範囲・最大入力電圧・回路/合計の電流制限など）にマッチした回路設計にする。',
-    '8. 使わない回路は assignments に含めなくてよい（含める場合は seriesModules を 0 にする）。',
-    `9. 【完全性】パネル総数 ${panel.moduleCount} 枚を可能な限り全て割り付ける。余りが出るのは、上記の電圧範囲・電流制限・MPPT均等などの制約でどうしても入らない場合に限る。制約が許す限り、空き回路を使ってでも残枚数を最小化すること。`,
-    '10. 【網羅】使用する回路は assignments に1つ残らず列挙する（要約の説明と assignments の実データを必ず一致させる。「全回路使用」と書いたのに一部しか列挙しない、といった不整合を起こさない）。',
-    '',
-    '返答は指定された JSON Schema に厳密準拠した JSON のみを返してください。',
-    '',
-    '【設計入力データ】',
-    JSON.stringify(body),
+    `総パネル ${panel.moduleCount}枚 / 目標過積載率 ${condition.targetOverloadRatio}% / 最低温度 ${condition.minTemperature}℃`,
+    `全体: PV ${result.totalPvCapacityKw.toFixed(1)}kW / PCS ${result.totalPcsCapacityKw.toFixed(1)}kW / 総過積載率 ${result.totalOverloadRatio.toFixed(1)}%`,
+    `未配置(残)パネル: ${remainingModules}枚`,
+    'PCSごと:',
+    ...lines,
   ].join('\n');
 }
 
-async function requestGeminiSuggestion(body: AiDesignRequest, env: Env) {
+// 決定的な考察文（AIが使えない場合のフォールバック）
+function deterministicCommentary(
+  body: AiDesignRequest,
+  result: DesignResult,
+  remainingModules: number
+): Commentary {
+  const { condition } = body;
+  const summary =
+    `全${body.panel.moduleCount}枚中 ${body.panel.moduleCount - remainingModules}枚を割り付けました` +
+    `（総過積載率 ${result.totalOverloadRatio.toFixed(1)}%、目標 ${condition.targetOverloadRatio}%）。` +
+    (remainingModules > 0 ? ` 制約上どうしても入らない ${remainingModules}枚が残っています。` : ' 全パネルを配置できました。');
+
+  const reasoning = [
+    'MPPTは2回路1組として、両回路を使う組は直列数を揃えています。',
+    '各回路の直列数は電圧・電流制約の許容範囲内に収め、1〜2枚の極小構成は作っていません。',
+    `過積載率が目標(${condition.targetOverloadRatio}%)に近づくよう、定格容量に応じてPCS間へ配分しています。`,
+  ];
+
+  const warnings = [...result.globalWarnings];
+  result.summaries.forEach((s) => warnings.push(...s.warnings));
+
+  return { summary, reasoning, warnings: Array.from(new Set(warnings)) };
+}
+
+function buildCommentaryPrompt(
+  body: AiDesignRequest,
+  result: DesignResult,
+  remainingModules: number
+): string {
+  return [
+    'あなたは太陽光発電所の回路設計をレビューするエンジニアです。',
+    '以下は「決定的アルゴリズムが確定させた回路割付の結果」です。割付は既に確定しており、変更しません。',
+    'この結果に対する日本語の「考察(reasoning)」と「注意点(warnings)」、および一文の「結論(summary)」だけを述べてください。',
+    '数値や割付そのものを作り直さず、与えられた事実に基づいて簡潔に説明・評価してください。',
+    '',
+    '【確定した設計の事実】',
+    buildDesignFacts(body, result, remainingModules),
+    '',
+    '返答は指定された JSON Schema（summary, reasoning, warnings）に厳密準拠した JSON のみ。',
+  ].join('\n');
+}
+
+// AIに考察文だけ生成させる。失敗時は null（呼び出し側でフォールバック）。
+async function requestGeminiCommentary(
+  body: AiDesignRequest,
+  result: DesignResult,
+  remainingModules: number,
+  env: Env
+): Promise<Commentary | null> {
   if (!env.GEMINI_API_KEY) {
-    throw new Error('Cloudflare secret GEMINI_API_KEY が設定されていません。');
+    return null;
   }
 
   const model = env.GEMINI_MODEL || DEFAULT_MODEL;
@@ -237,17 +232,15 @@ async function requestGeminiSuggestion(body: AiDesignRequest, env: Env) {
           contents: [
             {
               role: 'user',
-              parts: [{ text: buildPromptText(body) }],
+              parts: [{ text: buildCommentaryPrompt(body, result, remainingModules) }],
             },
           ],
           generationConfig: {
             responseMimeType: 'application/json',
-            responseSchema: suggestionSchema,
-            // 決定性を上げて実行ごとのブレを抑える。
-            temperature: 0,
+            responseSchema: commentarySchema,
+            temperature: 0.2,
             topP: 1,
-            // 回路数が多い場合でも全回路を列挙しきれるよう出力上限を拡大。
-            maxOutputTokens: 16384,
+            maxOutputTokens: 2048,
           },
         }),
       }
@@ -255,34 +248,28 @@ async function requestGeminiSuggestion(body: AiDesignRequest, env: Env) {
 
     const responsePayload = await response.json();
     if (!response.ok) {
-      const message =
-        responsePayload?.error?.message ||
-        responsePayload?.message ||
-        'Gemini API の呼び出しに失敗しました。';
-      throw new Error(message);
+      return null;
     }
-
-    // 安全性フィルタ等でブロックされた場合は candidates が空になる。
-    const blockReason = responsePayload?.promptFeedback?.blockReason;
-    if (blockReason) {
-      throw new Error(`Gemini がリクエストをブロックしました（理由: ${blockReason}）。`);
+    if (responsePayload?.promptFeedback?.blockReason) {
+      return null;
     }
 
     const outputText = extractOutputText(responsePayload);
     if (!outputText) {
-      throw new Error('AIの応答を解釈できませんでした。');
+      return null;
     }
 
     const parsed = JSON.parse(outputText);
+    if (typeof parsed?.summary !== 'string') {
+      return null;
+    }
     return {
-      suggestion: {
-        summary: parsed.summary,
-        reasoning: Array.isArray(parsed.reasoning) ? parsed.reasoning : [],
-        warnings: Array.isArray(parsed.warnings) ? parsed.warnings : [],
-        assignments: parseAssignments(parsed.assignments),
-      },
-      model: responsePayload?.modelVersion || model,
+      summary: parsed.summary,
+      reasoning: Array.isArray(parsed.reasoning) ? parsed.reasoning : [],
+      warnings: Array.isArray(parsed.warnings) ? parsed.warnings : [],
     };
+  } catch {
+    return null;
   } finally {
     clearTimeout(timeout);
   }
@@ -312,35 +299,51 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   }
 
   try {
-    const aiResponse = await requestGeminiSuggestion(body, context.env);
+    // 1. 割付は決定アルゴリズムで確定（全パネル配置・制約遵守）
+    const assignments = computeDeterministicAiAssignments(body.panel, body.pcsList, body.condition);
+
+    // 2. 念のため制約検証（アルゴリズムが正しければ空）
     const validationErrors = validateAiAssignments(
       body.panel,
       body.pcsList,
       body.condition,
-      aiResponse.suggestion.assignments
+      assignments
     );
-
     if (validationErrors.length > 0) {
       return json(
-        {
-          error: 'AI提案が制約を満たしませんでした。',
-          details: validationErrors,
-        },
-        {
-          status: 422,
-          headers: {
-            'Access-Control-Allow-Origin': '*',
-          },
-        }
+        { error: '割付結果が制約を満たしませんでした。', details: validationErrors },
+        { status: 422, headers: { 'Access-Control-Allow-Origin': '*' } }
       );
     }
 
-    return json(aiResponse, {
-      status: 200,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
+    // 3. 割付結果を集計し、残枚数を算出
+    const circuitAssignments = convertAiAssignmentsToCircuitAssignments(
+      body.panel,
+      body.pcsList,
+      body.condition,
+      assignments
+    );
+    const result = summarizeAssignments(body.panel, body.pcsList, body.condition, circuitAssignments);
+    const placed = assignments.reduce((sum, a) => sum + a.seriesModules, 0);
+    const remainingModules = body.panel.moduleCount - placed;
+
+    // 4. 考察文はAIに依頼（失敗時は決定的テキストにフォールバック）
+    const commentary =
+      (await requestGeminiCommentary(body, result, remainingModules, context.env)) ??
+      deterministicCommentary(body, result, remainingModules);
+
+    return json(
+      {
+        suggestion: { ...commentary, assignments },
+        model: context.env.GEMINI_MODEL || DEFAULT_MODEL,
       },
-    });
+      {
+        status: 200,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+        },
+      }
+    );
   } catch (error) {
     if (error instanceof Error && error.name === 'AbortError') {
       return json(
