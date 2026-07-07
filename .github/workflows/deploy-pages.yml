@@ -1,14 +1,21 @@
-name: Deploy Pages (index.html only)
+name: Deploy Pages
 
-# フロント(index.html)は単一ファイルで、割付ロジックは Cloudflare 側(functions/)。
-# そのため GitHub Pages は index.html / CNAME が変わった時だけ再デプロイする。
-# （毎コミットで再ビルドしてビルド回数のレート制限に当たるのを防ぐ）
+# 現在のフロントは Vite/React(src/) をビルドして dist/ を配備する。
+# そのため src や build 設定が変わったときに GitHub Pages を再デプロイする。
 on:
   push:
     branches:
       - main
       - feature/ai-auto-design-gemini
     paths:
+      - 'src/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'vite.config.ts'
+      - 'tsconfig.json'
+      - 'tsconfig.node.json'
+      - 'tailwind.config.js'
+      - 'postcss.config.js'
       - 'index.html'
       - 'CNAME'
   workflow_dispatch:
@@ -32,10 +39,22 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Stage static site (index.html + CNAME only)
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build site
+        run: npm run build
+
+      - name: Stage static site
         run: |
           mkdir -p _site
-          cp index.html _site/
+          cp -R dist/* _site/
           if [ -f CNAME ]; then cp CNAME _site/; fi
 
       - name: Setup Pages
