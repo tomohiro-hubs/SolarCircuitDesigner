@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { BrainCircuit, Calculator, RefreshCw, Sparkles, Zap } from 'lucide-react';
+import { BrainCircuit, Calculator, Download, RefreshCw, Sparkles, Zap } from 'lucide-react';
 import { PanelForm } from './components/PanelForm';
 import { PcsListForm } from './components/PcsListForm';
 import { ConditionForm } from './components/ConditionForm';
@@ -25,7 +25,9 @@ import { calculateDesign, calculateVocCold } from './logic/stringDesign';
 import {
   convertAiAssignmentsToCircuitAssignments,
   summarizeAssignments,
+  VoltagePreference,
 } from './logic/assignmentUtils';
+import { exportDesignToExcel } from './lib/excelExport';
 import pcsPresetsData from './data/pcsPresets.json';
 import { DEFAULT_PANEL_PRESETS } from './data/panelPresets';
 import {
@@ -134,8 +136,10 @@ function App() {
   const [aiSuggestion, setAiSuggestion] = useState<AiDesignSuggestion | null>(null);
   const [aiStatus, setAiStatus] = useState<AiStatus>('idle');
   const [aiErrorMessage, setAiErrorMessage] = useState<string | null>(null);
+  const [aiVoltagePref, setAiVoltagePref] = useState<VoltagePreference>('normal');
   const [appliedBy, setAppliedBy] = useState<AppliedBy>('rule');
   const [presetMessage, setPresetMessage] = useState<PresetMessage>(null);
+  const [projectName, setProjectName] = useState('');
 
   const panelPresets = useMemo(
     () => [...DEFAULT_PANEL_PRESETS, ...customPanelPresets],
@@ -483,7 +487,10 @@ function App() {
     return summarizeAssignments(panel, pcsList, condition, manualAssignments);
   }, [condition, manualAssignments, panel, pcsList, result]);
 
-  const handleAiDesign = useCallback(async () => {
+  const handleAiDesign = useCallback(async (
+    voltagePreference: VoltagePreference = 'normal',
+    autoApply = false
+  ) => {
     if (!isAiReady(panel, pcsList, condition)) {
       setAiStatus('error');
       setAiErrorMessage('AI自動設計に必要な入力が不足しています。パネル・PCS・設置条件を確認してください。');
@@ -492,6 +499,7 @@ function App() {
 
     setAiStatus('loading');
     setAiErrorMessage(null);
+    setAiVoltagePref(voltagePreference);
 
     try {
       const baselineResult = finalResult ?? result ?? runRuleDesign();
@@ -513,6 +521,7 @@ function App() {
             pcsList,
             condition,
             baselineResult,
+            voltagePreference,
           }),
         }
       );
@@ -531,6 +540,21 @@ function App() {
 
       setAiSuggestion(payload.suggestion);
       setAiStatus('success');
+
+      if (autoApply) {
+        // 電圧再検討ボタンからの再計算は即反映して比較しやすくする
+        const nextAssignments = convertAiAssignmentsToCircuitAssignments(
+          panel,
+          pcsList,
+          condition,
+          payload.suggestion.assignments
+        );
+        setManualAssignments(nextAssignments);
+        setAppliedBy('ai');
+      } else {
+        // 新しい提案を出したら「適用済み」状態はいったん解除
+        setAppliedBy((prev) => (prev === 'ai' ? 'rule' : prev));
+      }
     } catch (error) {
       console.error(error);
       setAiStatus('error');
@@ -562,6 +586,13 @@ function App() {
     setAiErrorMessage(null);
   }, []);
 
+  const handleExportExcel = useCallback(() => {
+    if (!finalResult) {
+      return;
+    }
+    exportDesignToExcel(finalResult, panel, pcsList, condition, projectName);
+  }, [condition, finalResult, panel, pcsList, projectName]);
+
   const aiButtonDisabled = aiStatus === 'loading' || isCalculating || !isAiReady(panel, pcsList, condition);
 
   return (
@@ -581,7 +612,7 @@ function App() {
           <div className="flex items-center gap-3">
             <button
               type="button"
-              onClick={handleAiDesign}
+              onClick={() => handleAiDesign()}
               disabled={aiButtonDisabled}
               className="inline-flex items-center justify-center gap-2 rounded-xl bg-cyan-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-cyan-700 disabled:cursor-not-allowed disabled:opacity-60"
             >
@@ -667,6 +698,9 @@ function App() {
                 suggestion={aiSuggestion}
                 isApplying={false}
                 applied={appliedBy === 'ai'}
+                voltagePreference={aiVoltagePref}
+                isReevaluating={aiStatus === 'loading'}
+                onReevaluate={(preference) => handleAiDesign(preference, true)}
                 onApply={applyAiSuggestion}
                 onDismiss={dismissAiSuggestion}
               />
@@ -680,6 +714,29 @@ function App() {
                     AI案を適用した状態です。必要に応じて下の割付表で微調整できます。
                   </div>
                 ) : null}
+
+                <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm sm:flex-row sm:items-end sm:justify-between">
+                  <div className="flex-1">
+                    <label className="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-400">
+                      発電所名（Excel出力用）
+                    </label>
+                    <input
+                      type="text"
+                      value={projectName}
+                      onChange={(event) => setProjectName(event.target.value)}
+                      placeholder="例: 〇〇太陽光発電所"
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleExportExcel}
+                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-700"
+                  >
+                    <Download size={16} />
+                    Excel出力
+                  </button>
+                </div>
 
                 <SummaryPanel result={finalResult} panel={panel} />
                 <VoltagePatternsPanel result={finalResult} pcsList={pcsList} panel={panel} />

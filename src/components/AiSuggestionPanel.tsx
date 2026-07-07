@@ -1,19 +1,32 @@
 import React from 'react';
 import { AiDesignSuggestion } from '../types';
-import { BrainCircuit, CheckCircle2, AlertTriangle, Sparkles } from 'lucide-react';
+import { VoltagePreference } from '../logic/assignmentUtils';
+import { BrainCircuit, CheckCircle2, AlertTriangle, Sparkles, RefreshCw, SlidersHorizontal } from 'lucide-react';
 
 interface Props {
   suggestion: AiDesignSuggestion;
   isApplying: boolean;
   applied: boolean;
+  voltagePreference: VoltagePreference;
+  isReevaluating: boolean;
+  onReevaluate: (preference: VoltagePreference) => void;
   onApply: () => void;
   onDismiss: () => void;
 }
+
+const VOLTAGE_OPTIONS: { key: VoltagePreference; label: string; sub: string }[] = [
+  { key: 'low', label: '電圧低め', sub: '直列少なめ' },
+  { key: 'normal', label: '電圧普通', sub: '推奨・再検討' },
+  { key: 'high', label: '電圧高め', sub: '直列多め' },
+];
 
 export const AiSuggestionPanel: React.FC<Props> = ({
   suggestion,
   isApplying,
   applied,
+  voltagePreference,
+  isReevaluating,
+  onReevaluate,
   onApply,
   onDismiss,
 }) => {
@@ -45,6 +58,53 @@ export const AiSuggestionPanel: React.FC<Props> = ({
             <h3 className="text-sm font-bold">結論</h3>
           </div>
           <p className="text-sm leading-6 text-slate-700">{suggestion.summary}</p>
+        </div>
+
+        {/* 電圧の狙いを変えて再検討 */}
+        <div className="rounded-xl border border-cyan-200 bg-cyan-50/50 p-4">
+          <div className="flex items-center gap-2 mb-1 text-slate-700">
+            <SlidersHorizontal size={16} className="text-cyan-600" />
+            <h3 className="text-sm font-bold">電圧の狙いを変えて再検討</h3>
+          </div>
+          <p className="text-xs text-slate-500 mb-3">
+            結果を見て、ストリングの直列枚数（電圧）を調整して再計算できます。
+          </p>
+          <div className="grid grid-cols-3 gap-2">
+            {VOLTAGE_OPTIONS.map((opt) => {
+              const active = voltagePreference === opt.key;
+              return (
+                <button
+                  key={opt.key}
+                  type="button"
+                  onClick={() => onReevaluate(opt.key)}
+                  disabled={isReevaluating}
+                  title={opt.sub}
+                  className={`px-3 py-2 rounded-lg text-sm font-bold border transition-all disabled:opacity-60 disabled:cursor-not-allowed ${
+                    active
+                      ? 'bg-cyan-600 text-white border-cyan-600 shadow'
+                      : 'bg-white text-slate-700 border-slate-300 hover:border-cyan-400 hover:bg-cyan-50'
+                  }`}
+                >
+                  {isReevaluating && active ? (
+                    <span className="inline-flex items-center gap-1">
+                      <RefreshCw size={12} className="animate-spin" />
+                      計算中
+                    </span>
+                  ) : (
+                    <>
+                      <div>{opt.label}</div>
+                      <div className={`text-[10px] font-normal ${active ? 'text-cyan-100' : 'text-slate-400'}`}>
+                        {opt.sub}
+                      </div>
+                    </>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-[11px] text-slate-400 mt-2">
+            ※ 電圧高めは回路に空きが出ることがあります（適正範囲内で調整）。電圧低めは推奨直列の下限付近を狙います。
+          </p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
