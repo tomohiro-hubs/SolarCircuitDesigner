@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { BrainCircuit, Calculator, RefreshCw, Sparkles, Zap } from 'lucide-react';
 import { PanelForm } from './components/PanelForm';
 import { PcsListForm } from './components/PcsListForm';
@@ -8,12 +8,15 @@ import { SummaryPanel } from './components/SummaryPanel';
 import { VoltagePatternsPanel } from './components/VoltagePatternsPanel';
 import { GlobalAlerts } from './components/GlobalAlerts';
 import { AiSuggestionPanel } from './components/AiSuggestionPanel';
+import { CustomPresetTransferPanel } from './components/CustomPresetTransferPanel';
 import {
   AiDesignResponse,
   AiDesignSuggestion,
+  PanelPreset,
   CircuitAssignment,
   DesignResult,
   PanelSpec,
+  PcsPreset,
   PcsSpec,
   SiteCondition,
   StringDesign,
@@ -23,6 +26,18 @@ import {
   convertAiAssignmentsToCircuitAssignments,
   summarizeAssignments,
 } from './logic/assignmentUtils';
+import pcsPresetsData from './data/pcsPresets.json';
+import { DEFAULT_PANEL_PRESETS } from './data/panelPresets';
+import {
+  buildCustomPresetExport,
+  loadCustomPanelPresets,
+  loadCustomPcsPresets,
+  parseCustomPresetImport,
+  saveCustomPanelPresets,
+  saveCustomPcsPresets,
+  upsertPresetByModel,
+} from './lib/presetStorage';
+import { importSettingsFromExcel } from './lib/excelImport';
 
 const INITIAL_PANEL: PanelSpec = {
   manufacturer: 'JA Solar',
@@ -62,6 +77,9 @@ const INITIAL_CONDITION: SiteCondition = {
 
 type AiStatus = 'idle' | 'loading' | 'success' | 'error';
 type AppliedBy = 'manual' | 'rule' | 'ai';
+type PresetMessage = { type: 'success' | 'error'; text: string } | null;
+
+const DEFAULT_PCS_PRESETS = pcsPresetsData as PcsPreset[];
 
 function hasFiniteNumbers(values: number[]): boolean {
   return values.every((value) => Number.isFinite(value));
@@ -105,6 +123,8 @@ function isAiReady(panel: PanelSpec, pcsList: PcsSpec[], condition: SiteConditio
 }
 
 function App() {
+  const [customPanelPresets, setCustomPanelPresets] = useState<PanelPreset[]>([]);
+  const [customPcsPresets, setCustomPcsPresets] = useState<PcsPreset[]>([]);
   const [panel, setPanel] = useState<PanelSpec>(INITIAL_PANEL);
   const [pcsList, setPcsList] = useState<PcsSpec[]>([INITIAL_PCS]);
   const [condition, setCondition] = useState<SiteCondition>(INITIAL_CONDITION);
@@ -115,6 +135,21 @@ function App() {
   const [aiStatus, setAiStatus] = useState<AiStatus>('idle');
   const [aiErrorMessage, setAiErrorMessage] = useState<string | null>(null);
   const [appliedBy, setAppliedBy] = useState<AppliedBy>('rule');
+  const [presetMessage, setPresetMessage] = useState<PresetMessage>(null);
+
+  const panelPresets = useMemo(
+    () => [...DEFAULT_PANEL_PRESETS, ...customPanelPresets],
+    [customPanelPresets]
+  );
+  const pcsPresets = useMemo(
+    () => [...DEFAULT_PCS_PRESETS, ...customPcsPresets],
+    [customPcsPresets]
+  );
+
+  useEffect(() => {
+    setCustomPanelPresets(loadCustomPanelPresets());
+    setCustomPcsPresets(loadCustomPcsPresets());
+  }, []);
 
   const handlePanelChange = useCallback((field: keyof PanelSpec, value: string | number) => {
     setPanel((prev) => ({ ...prev, [field]: value }));
@@ -123,6 +158,67 @@ function App() {
     setAiErrorMessage(null);
   }, []);
 
+  const handlePanelPresetSelect = useCallback((model: string) => {
+    const preset = panelPresets.find((item) => item.model === model);
+    if (!preset) {
+      return;
+    }
+
+    setPanel((prev) => ({
+      ...prev,
+      ...preset,
+    }));
+    setPresetMessage({
+      type: 'success',
+      text: `パネル項目「${model}」を反映しました。`,
+    });
+  }, [panelPresets]);
+
+  const handleSaveCustomPanel = useCallback(() => {
+    if (!panel.manufacturer.trim() || !panel.model.trim()) {
+      setPresetMessage({ type: 'error', text: 'パネル保存にはメーカーと型式が必要です。' });
+      return;
+    }
+
+    const nextPreset: PanelPreset = {
+      manufacturer: panel.manufacturer.trim(),
+      model: panel.model.trim(),
+      voc: panel.voc,
+      vmp: panel.vmp,
+      isc: panel.isc,
+      imp: panel.imp,
+      pmax: panel.pmax,
+      tempCoeffVoc: panel.tempCoeffVoc,
+      tempCoeffIsc: panel.tempCoeffIsc,
+    };
+
+    const values = [
+      nextPreset.voc,
+      nextPreset.vmp,
+      nextPreset.isc,
+      nextPreset.imp,
+      nextPreset.pmax,
+      nextPreset.tempCoeffVoc,
+      nextPreset.tempCoeffIsc,
+    ];
+    if (!hasFiniteNumbers(values)) {
+      setPresetMessage({ type: 'error', text: 'パネル保存前に数値項目をすべて確認してください。' });
+      return;
+    }
+
+    if (DEFAULT_PANEL_PRESETS.some((item) => item.model === nextPreset.model)) {
+      setPresetMessage({ type: 'error', text: `パネル「${nextPreset.model}」は既定項目と重複するため保存できません。` });
+      return;
+    }
+
+    setCustomPanelPresets((prev) => {
+      const next = upsertPresetByModel(prev, nextPreset);
+      saveCustomPanelPresets(next);
+      return next;
+    });
+    setPresetMessage({ type: 'success', text: `パネル「${nextPreset.model}」をカスタム項目として保存しました。` });
+  }, [panel]);
+
   const handlePcsChange = useCallback((id: string, field: keyof PcsSpec, value: string | number) => {
     setPcsList((prev) => prev.map((pcs) => (pcs.id === id ? { ...pcs, [field]: value } : pcs)));
     setAiSuggestion(null);
@@ -130,12 +226,178 @@ function App() {
     setAiErrorMessage(null);
   }, []);
 
+  const handlePcsPresetSelect = useCallback((id: string, model: string) => {
+    const preset = pcsPresets.find((item) => item.model === model);
+    if (!preset) {
+      return;
+    }
+
+    setPcsList((prev) => prev.map((pcs) => (pcs.id === id ? { ...pcs, ...preset } : pcs)));
+    setPresetMessage({
+      type: 'success',
+      text: `PCS項目「${model}」を ${id} に反映しました。`,
+    });
+  }, [pcsPresets]);
+
+  const handleSaveCustomPcs = useCallback((id: string) => {
+    const pcs = pcsList.find((item) => item.id === id);
+    if (!pcs) {
+      return;
+    }
+
+    if (!pcs.manufacturer.trim() || !pcs.model.trim()) {
+      setPresetMessage({ type: 'error', text: `${id} の保存にはメーカーと型式が必要です。` });
+      return;
+    }
+
+    const nextPreset: PcsPreset = {
+      manufacturer: pcs.manufacturer.trim(),
+      model: pcs.model.trim(),
+      ratedPower: pcs.ratedPower,
+      totalCircuits: pcs.totalCircuits,
+      mpptCount: pcs.mpptCount,
+      ratedInputVoltage: pcs.ratedInputVoltage,
+      startupVoltage: pcs.startupVoltage,
+      mpptMinVoltage: pcs.mpptMinVoltage,
+      mpptMaxVoltage: pcs.mpptMaxVoltage,
+      maxInputVoltage: pcs.maxInputVoltage,
+      maxInputCurrentPerCircuit: pcs.maxInputCurrentPerCircuit,
+      maxIscPerCircuit: pcs.maxIscPerCircuit,
+      maxIscTotal: pcs.maxIscTotal,
+      efficiency: pcs.efficiency,
+    };
+
+    const values = [
+      nextPreset.ratedPower,
+      nextPreset.totalCircuits,
+      nextPreset.mpptCount,
+      nextPreset.startupVoltage,
+      nextPreset.mpptMinVoltage,
+      nextPreset.mpptMaxVoltage,
+      nextPreset.maxInputVoltage,
+      nextPreset.maxInputCurrentPerCircuit,
+      nextPreset.maxIscPerCircuit,
+      nextPreset.maxIscTotal,
+      nextPreset.efficiency,
+    ];
+    if (!hasFiniteNumbers(values)) {
+      setPresetMessage({ type: 'error', text: `${id} の保存前に数値項目をすべて確認してください。` });
+      return;
+    }
+
+    if (DEFAULT_PCS_PRESETS.some((item) => item.model === nextPreset.model)) {
+      setPresetMessage({ type: 'error', text: `PCS「${nextPreset.model}」は既定項目と重複するため保存できません。` });
+      return;
+    }
+
+    setCustomPcsPresets((prev) => {
+      const next = upsertPresetByModel(prev, nextPreset);
+      saveCustomPcsPresets(next);
+      return next;
+    });
+    setPresetMessage({ type: 'success', text: `${id} を PCSカスタム項目「${nextPreset.model}」として保存しました。` });
+  }, [pcsList]);
+
   const handleAddPcs = useCallback(() => {
     setPcsList((prev) => [...prev, { ...INITIAL_PCS, id: `PCS${prev.length + 1}` }]);
     setAiSuggestion(null);
     setAiStatus('idle');
     setAiErrorMessage(null);
   }, []);
+
+  const handleExportCustomPresets = useCallback(() => {
+    const content = buildCustomPresetExport(customPanelPresets, customPcsPresets);
+    const blob = new Blob([content], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `solar-custom-presets-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(url);
+    setPresetMessage({ type: 'success', text: 'カスタム項目をJSONでエクスポートしました。' });
+  }, [customPanelPresets, customPcsPresets]);
+
+  const handleImportCustomPresets = useCallback(async (file: File) => {
+    try {
+      const text = await file.text();
+      const imported = parseCustomPresetImport(
+        text,
+        DEFAULT_PANEL_PRESETS.map((preset) => preset.model),
+        DEFAULT_PCS_PRESETS.map((preset) => preset.model)
+      );
+
+      const nextPanels = imported.panelPresets.reduce(upsertPresetByModel, customPanelPresets);
+      const nextPcs = imported.pcsPresets.reduce(upsertPresetByModel, customPcsPresets);
+
+      setCustomPanelPresets(nextPanels);
+      setCustomPcsPresets(nextPcs);
+      saveCustomPanelPresets(nextPanels);
+      saveCustomPcsPresets(nextPcs);
+
+      const baseMessage = `インポート完了: パネル ${imported.panelPresets.length} 件 / PCS ${imported.pcsPresets.length} 件`;
+      setPresetMessage({
+        type: imported.warnings.length > 0 ? 'error' : 'success',
+        text: imported.warnings.length > 0
+          ? `${baseMessage}。${imported.warnings.join(' / ')}`
+          : baseMessage,
+      });
+    } catch (error) {
+      setPresetMessage({
+        type: 'error',
+        text: error instanceof Error ? error.message : 'カスタム項目のインポートに失敗しました。',
+      });
+    }
+  }, [customPanelPresets, customPcsPresets]);
+
+  const handleDeletePanelPreset = useCallback((model: string) => {
+    setCustomPanelPresets((prev) => {
+      const next = prev.filter((preset) => preset.model !== model);
+      saveCustomPanelPresets(next);
+      return next;
+    });
+    setPresetMessage({ type: 'success', text: `パネル「${model}」を削除しました。` });
+  }, []);
+
+  const handleDeletePcsPreset = useCallback((model: string) => {
+    setCustomPcsPresets((prev) => {
+      const next = prev.filter((preset) => preset.model !== model);
+      saveCustomPcsPresets(next);
+      return next;
+    });
+    setPresetMessage({ type: 'success', text: `PCS「${model}」を削除しました。` });
+  }, []);
+
+  const resetDerivedStates = useCallback(() => {
+    setResult(null);
+    setManualAssignments(null);
+    setAiSuggestion(null);
+    setAiStatus('idle');
+    setAiErrorMessage(null);
+    setAppliedBy('rule');
+  }, []);
+
+  const handleImportExcelSettings = useCallback(async (file: File) => {
+    try {
+      const imported = await importSettingsFromExcel(file, panelPresets, pcsPresets);
+      setPanel(imported.panel);
+      setPcsList(imported.pcsList);
+      setCondition(imported.condition);
+      resetDerivedStates();
+      setPresetMessage({
+        type: imported.warnings.length > 0 ? 'error' : 'success',
+        text: imported.warnings.length > 0
+          ? `Excelを反映しました。${imported.warnings.join(' / ')}`
+          : 'Excelの設定数値を反映しました。',
+      });
+    } catch (error) {
+      setPresetMessage({
+        type: 'error',
+        text: error instanceof Error ? error.message : 'Excelの読込に失敗しました。',
+      });
+    }
+  }, [panelPresets, pcsPresets, resetDerivedStates]);
 
   const handleRemovePcs = useCallback((id: string) => {
     setPcsList((prev) => prev.filter((pcs) => pcs.id !== id));
@@ -346,12 +608,31 @@ function App() {
       <main className="flex-1 w-full max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 items-start">
           <div className="xl:col-span-5 space-y-6 xl:sticky xl:top-24 overflow-y-auto xl:max-h-[calc(100vh-8rem)] scrollbar-hide pb-4">
-            <PanelForm panel={panel} onChange={handlePanelChange} />
+            <CustomPresetTransferPanel
+              panelPresetNames={customPanelPresets.map((preset) => preset.model)}
+              pcsPresetNames={customPcsPresets.map((preset) => preset.model)}
+              message={presetMessage}
+              onExport={handleExportCustomPresets}
+              onImport={handleImportCustomPresets}
+              onImportExcel={handleImportExcelSettings}
+              onDeletePanelPreset={handleDeletePanelPreset}
+              onDeletePcsPreset={handleDeletePcsPreset}
+            />
+            <PanelForm
+              panel={panel}
+              presets={panelPresets}
+              onChange={handlePanelChange}
+              onPresetSelect={handlePanelPresetSelect}
+              onSaveCustom={handleSaveCustomPanel}
+            />
             <PcsListForm
               pcsList={pcsList}
+              presets={pcsPresets}
               onAdd={handleAddPcs}
               onRemove={handleRemovePcs}
               onChange={handlePcsChange}
+              onPresetSelect={handlePcsPresetSelect}
+              onSaveCustom={handleSaveCustomPcs}
             />
             <ConditionForm condition={condition} onChange={handleConditionChange} />
 

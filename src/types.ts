@@ -11,6 +11,8 @@ export type PanelSpec = {
   moduleCount: number;  // 総枚数
 };
 
+export type PanelPreset = Omit<PanelSpec, 'moduleCount'>;
+
 export type PcsSpec = {
   id: string;           // "PCS1" など内部ID
   manufacturer: string;
@@ -28,6 +30,8 @@ export type PcsSpec = {
   maxIscTotal: number;               // 最大短絡電流(PCS) [A]
   efficiency: number;   // 変換効率 [%]
 };
+
+export type PcsPreset = Omit<PcsSpec, 'id'>;
 
 export type SiteCondition = {
   minTemperature: number; // 想定最低温度 [°C]
@@ -92,4 +96,11 @@ export type AiDesignSuggestion = {
 export type AiDesignResponse = {
   suggestion: AiDesignSuggestion;
   model: string;
+};
+
+export type CustomPresetBundle = {
+  version: number;
+  exportedAt: string;
+  panelPresets: PanelPreset[];
+  pcsPresets: PcsPreset[];
 };
