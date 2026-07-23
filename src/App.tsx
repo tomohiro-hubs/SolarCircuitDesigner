@@ -223,7 +223,7 @@ function App() {
     setPresetMessage({ type: 'success', text: `パネル「${nextPreset.model}」をカスタム項目として保存しました。` });
   }, [panel]);
 
-  const handlePcsChange = useCallback((id: string, field: keyof PcsSpec, value: string | number) => {
+  const handlePcsChange = useCallback((id: string, field: keyof PcsSpec, value: string | number | boolean) => {
     setPcsList((prev) => prev.map((pcs) => (pcs.id === id ? { ...pcs, [field]: value } : pcs)));
     setAiSuggestion(null);
     setAiStatus('idle');

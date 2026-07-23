@@ -119,62 +119,67 @@ export function calculateDesign(
     vocStringCold: vocColdModule * seriesCount
   };
 
-  // 3. パネル割り当て計算 (ラウンドロビン方式: PCS間均等化)
-  let remainingModules = panel.moduleCount;
+  // 2.5. 手動指定PCSの回路構成を先に確定する
+  type ManualInfo = { usedCircuits: number; stringDesign: StringDesign; seriesModules: number };
+  const manualInfoMap = new Map<string, ManualInfo>();
+  let totalManualModules = 0;
+
+  for (const pcs of pcsList) {
+    if (pcs.manualCircuitEnabled && pcs.manualSeriesModules && pcs.manualSeriesModules > 0) {
+      const rawParallel = pcs.manualParallelCount;
+      const requestedCircuits = Number.isFinite(rawParallel) && rawParallel ? rawParallel : 0;
+      const usedCircuits = Math.max(0, Math.min(requestedCircuits, pcs.totalCircuits));
+      const manualStringDesign: StringDesign = {
+        seriesModules: pcs.manualSeriesModules,
+        vmpString: panel.vmp * pcs.manualSeriesModules,
+        vocStringCold: vocColdModule * pcs.manualSeriesModules
+      };
+      manualInfoMap.set(pcs.id, { usedCircuits, stringDesign: manualStringDesign, seriesModules: pcs.manualSeriesModules });
+      totalManualModules += pcs.manualSeriesModules * usedCircuits;
+    }
+  }
+
+  // 3. パネル割り当て計算 (手動指定PCSを先に消費し、残りをラウンドロビンで自動PCSに配分)
   const assignments: CircuitAssignment[] = [];
   const summaries: DesignSummary[] = [];
 
   let totalPvCapacityW = 0;
-  let totalPcsCapacityW = 0;
-  
-  // 有効なストリング数を計算
-  const totalStrings = seriesCount > 0 ? Math.floor(panel.moduleCount / seriesCount) : 0;
-  remainingModules -= totalStrings * seriesCount; // 端数は割り当てずに残る
+  const totalPcsCapacityW = pcsList.reduce((sum, pcs) => sum + pcs.ratedPower, 0);
 
-  // 全PCSの全回路スロットをリストアップ (割り当て計画用)
-  type Slot = { pcsIndex: number; pcsId: string; circuitIndex: number; mpptGroupIndex: number; };
-  const allSlots: Slot[] = [];
+  let modulePool = panel.moduleCount - totalManualModules;
+  if (modulePool < 0) {
+    globalWarnings.push(`警告: 手動指定を含む割当枚数がパネル総数(${panel.moduleCount}枚)を超えています。`);
+    modulePool = 0;
+  }
 
-  pcsList.forEach((pcs, pcsIndex) => {
-    totalPcsCapacityW += pcs.ratedPower;
-    const circuitsPerMppt = Math.floor(pcs.totalCircuits / pcs.mpptCount);
-    for (let i = 1; i <= pcs.totalCircuits; i++) {
-        allSlots.push({
-            pcsIndex,
-            pcsId: pcs.id,
-            circuitIndex: i,
-            mpptGroupIndex: Math.ceil(i / circuitsPerMppt)
-        });
-    }
-  });
+  // 有効なストリング数を計算 (自動割り当て分)
+  const totalStrings = seriesCount > 0 ? Math.floor(modulePool / seriesCount) : 0;
+  let remainingModules = modulePool - totalStrings * seriesCount; // 端数は割り当てずに残る
 
-  // スロットへの割り当て状況を管理するマップ
+  // 自動割り当て対象のPCS (手動指定PCSを除く)
+  const autoPcsList = pcsList.filter((pcs) => !manualInfoMap.has(pcs.id));
+
+  // スロットへの割り当て状況を管理するマップ (自動割り当て分のみ)
   // key: `${pcsId}-${circuitIndex}`
   const assignedMap = new Map<string, boolean>();
 
-  // 割り当てロジック: PCSごとに均等に配る (Round-Robin)
-  // スロットリストを、PCS順に並べ替えるのではなく、
-  // PCS1-回路1, PCS2-回路1, PCS3-回路1, ... PCS1-回路2, PCS2-回路2... の順で配るのが理想的だが、
-  // シンプルに「PCS1, PCS2...」の順で1つずつ配るループを回す。
-  
   // 各PCSの次の空き回路インデックス管理
-  const nextCircuitIndex = pcsList.map(() => 1); 
+  const nextCircuitIndex = new Map<string, number>(autoPcsList.map((pcs) => [pcs.id, 1]));
 
   let stringsToAssign = totalStrings;
-  
+
   while (stringsToAssign > 0) {
     let assignedInThisRound = false;
-    
-    for (let i = 0; i < pcsList.length; i++) {
+
+    for (const pcs of autoPcsList) {
         if (stringsToAssign <= 0) break;
 
-        const pcs = pcsList[i];
-        const circuitIdx = nextCircuitIndex[i];
+        const circuitIdx = nextCircuitIndex.get(pcs.id) ?? 1;
 
         if (circuitIdx <= pcs.totalCircuits) {
             // 割り当て実行
             assignedMap.set(`${pcs.id}-${circuitIdx}`, true);
-            nextCircuitIndex[i]++; // 次の回路へ進める
+            nextCircuitIndex.set(pcs.id, circuitIdx + 1); // 次の回路へ進める
             stringsToAssign--;
             assignedInThisRound = true;
         }
@@ -183,7 +188,7 @@ export function calculateDesign(
     // 全PCSが満杯ならループ終了
     if (!assignedInThisRound) break;
   }
-  
+
   // 割り当てられなかったストリングがあれば残材に戻す
   if (stringsToAssign > 0) {
       remainingModules += stringsToAssign * seriesCount;
@@ -193,22 +198,31 @@ export function calculateDesign(
   for (const pcs of pcsList) {
     let modulesAssignedToPcs = 0;
     let usedCircuits = 0;
-    const pcsWarnings: string[] = [...checkCurrentConstraints(panel, pcs, stringDesign)];
+    const manualInfo = manualInfoMap.get(pcs.id);
+    const pcsWarnings: string[] = [...checkCurrentConstraints(panel, pcs, manualInfo ? manualInfo.stringDesign : stringDesign)];
 
     const circuitsPerMppt = Math.floor(pcs.totalCircuits / pcs.mpptCount);
 
     for (let i = 1; i <= pcs.totalCircuits; i++) {
       const mpptGroupIndex = Math.ceil(i / circuitsPerMppt);
-      const isAssigned = assignedMap.get(`${pcs.id}-${i}`);
-      
+
       let assignedString: StringDesign | null = null;
 
-      if (isAssigned) {
-        assignedString = { ...stringDesign };
-        modulesAssignedToPcs += seriesCount;
-        usedCircuits++;
-      } 
-      
+      if (manualInfo) {
+        if (i <= manualInfo.usedCircuits) {
+          assignedString = { ...manualInfo.stringDesign };
+          modulesAssignedToPcs += manualInfo.seriesModules;
+          usedCircuits++;
+        }
+      } else {
+        const isAssigned = assignedMap.get(`${pcs.id}-${i}`);
+        if (isAssigned) {
+          assignedString = { ...stringDesign };
+          modulesAssignedToPcs += seriesCount;
+          usedCircuits++;
+        }
+      }
+
       assignments.push({
         pcsId: pcs.id,
         circuitIndex: i,
@@ -229,9 +243,17 @@ export function calculateDesign(
     if (totalIsc > pcs.maxIscTotal) {
       pcsWarnings.push(`警告: PCS合計短絡電流(${totalIsc.toFixed(1)}A)が最大値(${pcs.maxIscTotal}A)を超過`);
     }
-    
+
     if (overloadRatio < condition.targetOverloadRatio * 0.8 && pcs.ratedPower > 0) {
         pcsWarnings.push(`情報: 過積載率(${overloadRatio.toFixed(1)}%)が目標(${condition.targetOverloadRatio}%)より大幅に低いです`);
+    }
+
+    // 手動指定PCSの直列数が推奨範囲内かチェック
+    if (manualInfo) {
+      const manualRange = calculateAllowedSeriesRange(panel, pcs, vocColdModule);
+      if (manualInfo.seriesModules < manualRange.min || manualInfo.seriesModules > manualRange.max) {
+        pcsWarnings.push(`警告: ${pcs.id} の手動直列数(${manualInfo.seriesModules})が推奨範囲(${manualRange.min}〜${manualRange.max}枚)外です`);
+      }
     }
 
     summaries.push({

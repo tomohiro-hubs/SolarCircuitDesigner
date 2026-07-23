@@ -8,7 +8,7 @@ interface Props {
   presets: PcsPreset[];
   onAdd: () => void;
   onRemove: (id: string) => void;
-  onChange: (id: string, field: keyof PcsSpec, value: string | number) => void;
+  onChange: (id: string, field: keyof PcsSpec, value: string | number | boolean) => void;
   onPresetSelect: (id: string, model: string) => void;
   onSaveCustom: (id: string) => void;
 }
@@ -168,6 +168,39 @@ export const PcsListForm: React.FC<Props> = ({
                       value={pcs.mpptCount || ''}
                       onChange={(e) => handleChange(pcs.id, e)}
                     />
+                  </div>
+
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-3">
+                    <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={!!pcs.manualCircuitEnabled}
+                        onChange={(e) => onChange(pcs.id, 'manualCircuitEnabled', e.target.checked)}
+                        className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600"
+                      />
+                      回路構成を手動指定
+                    </label>
+                    {pcs.manualCircuitEnabled && (
+                      <div className="grid grid-cols-2 gap-3">
+                        <InputField
+                          label="直列数"
+                          name="manualSeriesModules"
+                          type="number"
+                          unit="枚"
+                          value={pcs.manualSeriesModules || ''}
+                          onChange={(e) => handleChange(pcs.id, e)}
+                        />
+                        <InputField
+                          label="並列数"
+                          name="manualParallelCount"
+                          type="number"
+                          unit="回路"
+                          value={pcs.manualParallelCount || ''}
+                          onChange={(e) => handleChange(pcs.id, e)}
+                          helperText="並列数=回路数として扱います（各回路が直列数の枚数で構成されます）"
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
 

@@ -390,8 +390,11 @@
         maxIscPerCircuit: Number(pcs.maxIscPerCircuit) || 0,
         maxIscTotal: Number(pcs.maxIscTotal) || 0,
         efficiency: Number(pcs.efficiency) || 0,
+        manualCircuitEnabled: !!pcs.manualCircuitEnabled,
+        manualSeriesModules: Number(pcs.manualSeriesModules) || 0,
+        manualParallelCount: Number(pcs.manualParallelCount) || 0,
       }));
-      
+
       // Design Constraint: Voc at Min Temp (Worst Case for Safety)
       const vocColdModule = calculateVocCold(panel, condition.minTemperature);
       
@@ -425,61 +428,94 @@
         vocStringSpot: vocSpotUnit * seriesCount // Add Spot Voc for reference
       };
 
+      // 手動指定PCSの回路構成を先に確定する
+      const manualInfoMap = new Map(); // pcsId -> { usedCircuits, stringDesign, seriesModules }
+      let totalManualModules = 0;
+
+      for (const pcs of pcsList) {
+        if (pcs.manualCircuitEnabled && pcs.manualSeriesModules > 0) {
+          const mSeries = pcs.manualSeriesModules;
+          const usedCircuits = Math.max(0, Math.min(Math.floor(pcs.manualParallelCount) || 0, pcs.totalCircuits));
+          const manualStringDesign = {
+            seriesModules: mSeries,
+            vmpString: vmpSpotUnit * mSeries,
+            vocStringCold: vocColdModule * mSeries,
+            vocStringSpot: vocSpotUnit * mSeries
+          };
+          manualInfoMap.set(pcs.id, { usedCircuits, stringDesign: manualStringDesign, seriesModules: mSeries });
+          totalManualModules += mSeries * usedCircuits;
+        }
+      }
+
       // 割り当てロジック (Round-Robin)
-      let remainingModules = panel.moduleCount;
       const assignments = [];
       const summaries = [];
 
       let totalPvCapacityW = 0;
       let totalPcsCapacityW = 0;
-      
-      const totalStrings = seriesCount > 0 ? Math.floor(panel.moduleCount / seriesCount) : 0;
-      remainingModules -= totalStrings * seriesCount;
 
-      // マップ準備
+      let modulePool = panel.moduleCount - totalManualModules;
+      let manualPoolExceeded = false;
+      if (modulePool < 0) {
+        globalWarnings.push(`警告: 手動指定を含む割当枚数がパネル総数(${panel.moduleCount}枚)を超えています。`);
+        modulePool = 0;
+        manualPoolExceeded = true;
+      }
+
+      const totalStrings = seriesCount > 0 ? Math.floor(modulePool / seriesCount) : 0;
+      let remainingModules = modulePool - totalStrings * seriesCount;
+
+      // 自動割り当て対象のPCS (手動指定PCSを除く)
+      const autoPcsList = pcsList.filter(pcs => !manualInfoMap.has(pcs.id));
+
+      // マップ準備 (自動割り当て分のみ)
       const assignedMap = new Map();
-      const nextCircuitIndex = pcsList.map(() => 1); 
+      const nextCircuitIndex = new Map(autoPcsList.map(pcs => [pcs.id, 1]));
       let stringsToAssign = totalStrings;
-      
+
       while (stringsToAssign > 0) {
         let assignedInThisRound = false;
-        for (let i = 0; i < pcsList.length; i++) {
+        for (const pcs of autoPcsList) {
             if (stringsToAssign <= 0) break;
-            const pcs = pcsList[i];
-            const circuitIdx = nextCircuitIndex[i];
+            const circuitIdx = nextCircuitIndex.get(pcs.id) ?? 1;
             if (circuitIdx <= pcs.totalCircuits) {
                 assignedMap.set(`${pcs.id}-${circuitIdx}`, true);
-                nextCircuitIndex[i]++;
+                nextCircuitIndex.set(pcs.id, circuitIdx + 1);
                 stringsToAssign--;
                 assignedInThisRound = true;
             }
         }
         if (!assignedInThisRound) break;
       }
-      
+
       if (stringsToAssign > 0) {
           remainingModules += stringsToAssign * seriesCount;
       }
 
       // 結果構築
       for (const pcs of pcsList) {
-        const pcsAssignments = []; 
+        const pcsAssignments = [];
         let modulesAssignedToPcs = 0;
         let usedCircuits = 0;
         let pcsWarnings = [];
-        
+
+        const manualInfo = manualInfoMap.get(pcs.id);
+        // このPCSに適用するストリング設計 (手動指定PCSは自身の直列数を使用)
+        const effectiveStringDesign = manualInfo ? manualInfo.stringDesign : stringDesign;
+        const effectiveSeriesCount = manualInfo ? manualInfo.seriesModules : seriesCount;
+
         // 電圧チェック (SAFETY: Cold Voc, SPOT: Spot Vmp)
-        if (seriesCount > 0) {
+        if (effectiveSeriesCount > 0) {
             // Check 1: Safety (Max Input Voltage vs Cold Voc)
-            if (stringDesign.vocStringCold > pcs.maxInputVoltage) {
-                pcsWarnings.push(`警告: 低温時開放電圧(${stringDesign.vocStringCold.toFixed(1)}V)が最大入力(${pcs.maxInputVoltage}V)超過`);
+            if (effectiveStringDesign.vocStringCold > pcs.maxInputVoltage) {
+                pcsWarnings.push(`警告: 低温時開放電圧(${effectiveStringDesign.vocStringCold.toFixed(1)}V)が最大入力(${pcs.maxInputVoltage}V)超過`);
             }
             // Check 2: Performance (MPPT Range vs Spot Vmp)
-            if (stringDesign.vmpString < pcs.mpptMinVoltage) {
-                pcsWarnings.push(`警告: 動作電圧(${stringDesign.vmpString.toFixed(1)}V @${spotT}℃)がMPPT下限(${pcs.mpptMinVoltage}V)未満`);
+            if (effectiveStringDesign.vmpString < pcs.mpptMinVoltage) {
+                pcsWarnings.push(`警告: 動作電圧(${effectiveStringDesign.vmpString.toFixed(1)}V @${spotT}℃)がMPPT下限(${pcs.mpptMinVoltage}V)未満`);
             }
-            if (stringDesign.vmpString > pcs.mpptMaxVoltage) {
-                pcsWarnings.push(`警告: 動作電圧(${stringDesign.vmpString.toFixed(1)}V @${spotT}℃)がMPPT上限(${pcs.mpptMaxVoltage}V)超過`);
+            if (effectiveStringDesign.vmpString > pcs.mpptMaxVoltage) {
+                pcsWarnings.push(`警告: 動作電圧(${effectiveStringDesign.vmpString.toFixed(1)}V @${spotT}℃)がMPPT上限(${pcs.mpptMaxVoltage}V)超過`);
             }
         }
 
@@ -487,15 +523,23 @@
 
         for (let i = 1; i <= pcs.totalCircuits; i++) {
           const mpptGroupIndex = Math.ceil(i / circuitsPerMppt);
-          const isAssigned = assignedMap.get(`${pcs.id}-${i}`);
           let assignedString = null;
 
-          if (isAssigned) {
-            assignedString = { ...stringDesign };
-            modulesAssignedToPcs += seriesCount;
-            usedCircuits++;
-          } 
-          
+          if (manualInfo) {
+            if (i <= manualInfo.usedCircuits) {
+              assignedString = { ...manualInfo.stringDesign };
+              modulesAssignedToPcs += manualInfo.seriesModules;
+              usedCircuits++;
+            }
+          } else {
+            const isAssigned = assignedMap.get(`${pcs.id}-${i}`);
+            if (isAssigned) {
+              assignedString = { ...stringDesign };
+              modulesAssignedToPcs += seriesCount;
+              usedCircuits++;
+            }
+          }
+
           const assignmentData = {
             pcsId: pcs.id,
             circuitIndex: i,
@@ -505,9 +549,9 @@
             currentImp: assignedString ? impSpotUnit : 0,
             currentIsc: assignedString ? iscSpotUnit : 0
           };
-          
+
           assignments.push(assignmentData);
-          if (isAssigned) {
+          if (assignedString) {
              pcsAssignments.push(assignmentData);
           }
         }
@@ -543,6 +587,14 @@
             pcsWarnings.push(`情報: 過積載率(${overloadRatioSTC.toFixed(1)}%)が目標(${condition.targetOverloadRatio}%)より大幅に低いです`);
         }
 
+        // 手動指定PCSの直列数が推奨範囲内かチェック
+        if (manualInfo) {
+          const manualRange = calculateAllowedSeriesRange(panel, pcs, vocColdModule);
+          if (manualInfo.seriesModules < manualRange.min || manualInfo.seriesModules > manualRange.max) {
+            pcsWarnings.push(`警告: ${pcs.id} の手動直列数(${manualInfo.seriesModules})が推奨範囲(${manualRange.min}〜${manualRange.max}枚)外です`);
+          }
+        }
+
         // 重複警告の削除
         pcsWarnings = [...new Set(pcsWarnings)];
 
@@ -559,7 +611,7 @@
         totalPcsCapacityW += pcs.ratedPower;
       }
 
-      if (remainingModules > 0) {
+      if (remainingModules > 0 && !manualPoolExceeded) {
         globalWarnings.push(`注意: ${remainingModules} 枚のパネルが配置されずに残っています。PCSを追加するか構成を見直してください。`);
       }
 
@@ -916,9 +968,32 @@
                 </div>
               )}
             </div>
+
+            <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4 space-y-3">
+              <label className="flex items-center gap-2 text-xs font-bold text-slate-700 uppercase tracking-wider cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={!!pcs.manualCircuitEnabled}
+                  onChange={(e) => onChange(pcs.id, 'manualCircuitEnabled', e.target.checked)}
+                  className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600"
+                />
+                回路構成を手動指定
+              </label>
+              {pcs.manualCircuitEnabled && (
+                <div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <InputField label="直列数" value={pcs.manualSeriesModules} onChange={(v) => onChange(pcs.id, 'manualSeriesModules', v)} unit="枚" />
+                    <InputField label="並列数" value={pcs.manualParallelCount} onChange={(v) => onChange(pcs.id, 'manualParallelCount', v)} unit="回路" />
+                  </div>
+                  <p className="text-xs text-slate-500 mt-2">
+                    ※ 並列数=回路数として扱います（各回路が直列数の枚数で構成されます）
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
         );})}
-        
+
         <div className="flex flex-col sm:flex-row gap-2">
             <button onClick={onAdd} className="flex-1 py-3 border-2 border-dashed border-slate-300 rounded-xl text-slate-500 font-bold hover:border-indigo-400 hover:text-indigo-500 hover:bg-indigo-50 transition-all flex items-center justify-center gap-2">
               <i className="fa-solid fa-plus"></i>
@@ -1905,7 +1980,8 @@
       manufacturer: '', model: '', voc: '', vmp: '', isc: '', imp: '', pmax: '', tempCoeffVoc: '', tempCoeffIsc: '', tempCoeffPmax: '', moduleCount: ''
     };
     const INITIAL_PCS = {
-      id: 'PCS1', manufacturer: '', model: '', ratedPower: '', totalCircuits: '', mpptCount: '', ratedInputVoltage: '', startupVoltage: '', mpptMinVoltage: '', mpptMaxVoltage: '', maxInputVoltage: '', maxInputCurrentPerCircuit: '', maxIscPerCircuit: '', maxIscTotal: '', efficiency: ''
+      id: 'PCS1', manufacturer: '', model: '', ratedPower: '', totalCircuits: '', mpptCount: '', ratedInputVoltage: '', startupVoltage: '', mpptMinVoltage: '', mpptMaxVoltage: '', maxInputVoltage: '', maxInputCurrentPerCircuit: '', maxIscPerCircuit: '', maxIscTotal: '', efficiency: '',
+      manualCircuitEnabled: false, manualSeriesModules: '', manualParallelCount: ''
     };
     const INITIAL_CONDITION = {
       minTemperature: -10, targetOverloadRatio: 145, manualSeriesCount: 0
@@ -2026,8 +2102,11 @@
 
       const handleBulkAddPcs = useCallback((count) => setPcsList(prev => {
         const lastPcs = prev[prev.length - 1];
-        const baseData = lastPcs ? { ...lastPcs } : { ...INITIAL_PCS };
-        
+        const baseData = {
+          ...(lastPcs ? { ...lastPcs } : { ...INITIAL_PCS }),
+          manualCircuitEnabled: false, manualSeriesModules: '', manualParallelCount: ''
+        };
+
         let newPcsList = [...prev];
         let currentMaxIdNum = 0;
         

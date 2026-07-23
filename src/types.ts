@@ -29,6 +29,9 @@ export type PcsSpec = {
   maxIscPerCircuit: number;          // 最大短絡電流(回路) [A]
   maxIscTotal: number;               // 最大短絡電流(PCS) [A]
   efficiency: number;   // 変換効率 [%]
+  manualCircuitEnabled?: boolean;   // 回路構成を手動指定するか
+  manualSeriesModules?: number;     // 手動指定: 直列数（1回路あたり直列枚数）
+  manualParallelCount?: number;     // 手動指定: 並列数（=回路数として解釈）
 };
 
 export type PcsPreset = Omit<PcsSpec, 'id'>;
