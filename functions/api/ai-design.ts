@@ -15,8 +15,8 @@ interface Env {
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 const DEFAULT_MODEL = 'gemini-3.1-flash-lite';
 const REQUEST_TIMEOUT_MS = 60000;
-const MAX_PCS_COUNT = 12;
-const MAX_TOTAL_CIRCUITS = 256;
+const MAX_PCS_COUNT = 50;
+const MAX_TOTAL_CIRCUITS = 1024;
 
 // 割付はサーバー側の決定アルゴリズムが行い、AIは「考察・注意点」の文章だけを担当する。
 // Gemini の responseSchema は OpenAPI サブセット。additionalProperties は非対応なので付けない。

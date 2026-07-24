@@ -2082,7 +2082,12 @@
       
       const handleAddPcs = useCallback(() => setPcsList(prev => {
         const lastPcs = prev[prev.length - 1];
-        const baseData = lastPcs ? { ...lastPcs } : { ...INITIAL_PCS };
+        // 先頭PCS(PCS1)が手動指定ONなら、その直列/並列設定を複製する。OFFなら既定にリセット。
+        const firstPcs = prev[0];
+        const manualCfg = firstPcs && firstPcs.manualCircuitEnabled
+          ? { manualCircuitEnabled: true, manualSeriesModules: firstPcs.manualSeriesModules, manualParallelCount: firstPcs.manualParallelCount }
+          : { manualCircuitEnabled: false, manualSeriesModules: '', manualParallelCount: '' };
+        const baseData = { ...(lastPcs ? { ...lastPcs } : { ...INITIAL_PCS }), ...manualCfg };
         
         let currentMaxIdNum = 0;
         prev.forEach(p => {
@@ -2102,9 +2107,14 @@
 
       const handleBulkAddPcs = useCallback((count) => setPcsList(prev => {
         const lastPcs = prev[prev.length - 1];
+        // 先頭PCS(PCS1)が手動指定ONなら、その直列/並列設定を複製する。OFFなら既定にリセット。
+        const firstPcs = prev[0];
+        const manualCfg = firstPcs && firstPcs.manualCircuitEnabled
+          ? { manualCircuitEnabled: true, manualSeriesModules: firstPcs.manualSeriesModules, manualParallelCount: firstPcs.manualParallelCount }
+          : { manualCircuitEnabled: false, manualSeriesModules: '', manualParallelCount: '' };
         const baseData = {
           ...(lastPcs ? { ...lastPcs } : { ...INITIAL_PCS }),
-          manualCircuitEnabled: false, manualSeriesModules: '', manualParallelCount: ''
+          ...manualCfg
         };
 
         let newPcsList = [...prev];
