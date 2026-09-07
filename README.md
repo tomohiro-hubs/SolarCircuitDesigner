@@ -65,20 +65,20 @@ React + Tailwind CSS で構築されており、サーバサイド処理を必�
 本番環境で高速化・軽量化が必要な場合は、Create React App や Vite 等を使用したビルド環境への移行を推奨します。
 
 ## AI自動設計のセットアップ
-AI自動設計はフロントから直接 API キーを扱わず、サーバーレス関数経由で Gemini API を呼び出します。
+AI自動設計はフロントから直接 API キーを扱わず、サーバーレス関数経由で OpenAI API を呼び出します。
 
 ### 必要な環境変数
-*   `GEMINI_API_KEY`: サーバーレス環境に設定する Gemini API キー
-*   `GEMINI_MODEL`: 任意。未指定時は `gemini-3.1-flash-lite`
+*   `OPENAI_API_KEY`: サーバーレス環境に設定する OpenAI API キー
+*   `OPENAI_MODEL`: 任意。未指定時は `gpt-5.6-luna`
 *   `VITE_AI_DESIGN_ENDPOINT`: 任意。フロントから呼び出す AI API の URL。未指定時は `/api/ai-design`
 
 ### 前提
-*   `GEMINI_API_KEY` は `VITE_` プレフィックス付きでフロントに渡さないでください。
+*   `OPENAI_API_KEY` は `VITE_` プレフィックス付きでフロントに渡さないでください。
 *   GitHub Pages のような静的配信だけでは `api/ai-design.ts` は動きません。
 *   Vercel / Netlify / Cloudflare Workers など、サーバーレス関数を持てる環境での公開を前提にしてください。
 
 ## Cloudflare での API キー保管
-Cloudflare に載せる場合は、`GEMINI_API_KEY` をコードや `wrangler.jsonc` に書かず、Cloudflare Secret として登録してください。Secret は Cloudflare 側で暗号化保管され、`functions/api/ai-design.ts` からだけ参照されます。
+Cloudflare に載せる場合は、`OPENAI_API_KEY` をコードや `wrangler.jsonc` に書かず、Cloudflare Secret として登録してください。Secret は Cloudflare 側で暗号化保管され、`functions/api/ai-design.ts` からだけ参照されます。
 
 ### 追加したファイル
 *   `wrangler.jsonc`: Cloudflare Pages 用の設定
@@ -88,11 +88,11 @@ Cloudflare に載せる場合は、`GEMINI_API_KEY` をコードや `wrangler.js
 ### 手動で API キーを入れる方法
 1. `npm run build`
 2. `npx wrangler login`
-3. `echo "あなたのAPIキー" | npx wrangler pages secret put GEMINI_API_KEY --project-name solar-circuit-designer`
+3. `echo "あなたのAPIキー" | npx wrangler pages secret put OPENAI_API_KEY --project-name solar-circuit-designer`
 
 ### 任意のモデル指定
-`wrangler.jsonc` の `GEMINI_MODEL` を変更するか、Cloudflare 側の環境変数で上書きしてください。
+`wrangler.jsonc` の `OPENAI_MODEL` を変更するか、Cloudflare 側の環境変数で上書きしてください。
 
 ### ローカル確認
-*   `.dev.vars` を作成して `GEMINI_API_KEY=...` を入れる
+*   `.dev.vars` を作成して `OPENAI_API_KEY=...` を入れる
 *   `npx wrangler pages dev dist`

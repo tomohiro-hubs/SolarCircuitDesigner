@@ -8,20 +8,23 @@ import {
 import { AiDesignRequest, DesignResult } from '../../src/types';
 
 interface Env {
-  GEMINI_API_KEY: string;
-  GEMINI_MODEL?: string;
+  OPENAI_API_KEY: string;
+  OPENAI_MODEL?: string;
 }
 
-const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
-const DEFAULT_MODEL = 'gemini-3.1-flash-lite';
+// OpenAI Responses API（構造化出力は text.format の json_schema を使う）
+const OPENAI_RESPONSES_URL = 'https://api.openai.com/v1/responses';
+// モデルIDは wrangler.jsonc の OPENAI_MODEL で上書き可能。
+const DEFAULT_MODEL = 'gpt-5.6-luna';
 const REQUEST_TIMEOUT_MS = 60000;
 const MAX_PCS_COUNT = 50;
 const MAX_TOTAL_CIRCUITS = 1024;
 
 // 割付はサーバー側の決定アルゴリズムが行い、AIは「考察・注意点」の文章だけを担当する。
-// Gemini の responseSchema は OpenAPI サブセット。additionalProperties は非対応なので付けない。
+// OpenAI の strict な json_schema は additionalProperties: false と全プロパティの required が必須。
 const commentarySchema = {
   type: 'object',
+  additionalProperties: false,
   required: ['summary', 'reasoning', 'warnings'],
   properties: {
     summary: { type: 'string' },
@@ -129,25 +132,19 @@ function validateAndNormalize(body: any): string | null {
   return null;
 }
 
+// Responses API の出力: output[] の中の message アイテム -> content[].output_text
 function extractOutputText(responsePayload: any): string | null {
-  // 念のため、すでにパース済みの構造が返ってきた場合にも対応。
-  if (
-    responsePayload &&
-    typeof responsePayload === 'object' &&
-    typeof responsePayload.summary === 'string' &&
-    Array.isArray(responsePayload.reasoning) &&
-    Array.isArray(responsePayload.warnings) &&
-    Array.isArray(responsePayload.assignments)
-  ) {
-    return JSON.stringify(responsePayload);
+  if (typeof responsePayload?.output_text === 'string' && responsePayload.output_text.trim()) {
+    return responsePayload.output_text.trim();
   }
 
-  // Gemini generateContent の正規レスポンス: candidates[0].content.parts[].text
-  const candidates = Array.isArray(responsePayload?.candidates) ? responsePayload.candidates : [];
-  for (const candidate of candidates) {
-    const parts = Array.isArray(candidate?.content?.parts) ? candidate.content.parts : [];
-    const text = parts
-      .map((part: any) => (typeof part?.text === 'string' ? part.text : ''))
+  const output = Array.isArray(responsePayload?.output) ? responsePayload.output : [];
+  for (const item of output) {
+    // reasoning など message 以外のアイテムは読み飛ばす。
+    if (item?.type && item.type !== 'message') continue;
+    const contents = Array.isArray(item?.content) ? item.content : [];
+    const text = contents
+      .map((part: any) => (part?.type === 'output_text' && typeof part.text === 'string' ? part.text : ''))
       .join('')
       .trim();
     if (text) {
@@ -223,53 +220,58 @@ function buildCommentaryPrompt(
 }
 
 // AIに考察文だけ生成させる。失敗時は null（呼び出し側でフォールバック）。
-async function requestGeminiCommentary(
+async function requestCommentary(
   body: AiDesignRequest,
   result: DesignResult,
   remainingModules: number,
   env: Env
 ): Promise<Commentary | null> {
-  if (!env.GEMINI_API_KEY) {
+  if (!env.OPENAI_API_KEY) {
     return null;
   }
 
-  const model = env.GEMINI_MODEL || DEFAULT_MODEL;
+  const model = env.OPENAI_MODEL || DEFAULT_MODEL;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
   try {
-    const response = await fetch(
-      `${GEMINI_API_BASE}/models/${encodeURIComponent(model)}:generateContent`,
-      {
-        method: 'POST',
-        headers: {
-          'x-goog-api-key': env.GEMINI_API_KEY,
-          'Content-Type': 'application/json',
-        },
-        signal: controller.signal,
-        body: JSON.stringify({
-          contents: [
-            {
-              role: 'user',
-              parts: [{ text: buildCommentaryPrompt(body, result, remainingModules) }],
-            },
-          ],
-          generationConfig: {
-            responseMimeType: 'application/json',
-            responseSchema: commentarySchema,
-            temperature: 0.2,
-            topP: 1,
-            maxOutputTokens: 2048,
+    const response = await fetch(OPENAI_RESPONSES_URL, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${env.OPENAI_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      signal: controller.signal,
+      body: JSON.stringify({
+        model,
+        input: [
+          {
+            role: 'user',
+            content: [{ type: 'input_text', text: buildCommentaryPrompt(body, result, remainingModules) }],
           },
-        }),
-      }
-    );
+        ],
+        // gpt-5.6系は temperature 非対応。深さは reasoning.effort で制御する。
+        // 事実の要約だけなので low で十分（推論トークン＝コストを抑える）。
+        reasoning: { effort: 'low' },
+        text: {
+          format: {
+            type: 'json_schema',
+            name: 'design_commentary',
+            strict: true,
+            schema: commentarySchema,
+          },
+        },
+        // reasoning トークンも max_output_tokens に含まれるため余裕を持たせる。
+        max_output_tokens: 4096,
+      }),
+    });
 
     const responsePayload = await response.json();
     if (!response.ok) {
       return null;
     }
-    if (responsePayload?.promptFeedback?.blockReason) {
+    // 打ち切り（トークン上限など）の場合は JSON が不完全になりうるのでフォールバックする。
+    if (responsePayload?.status === 'incomplete') {
       return null;
     }
 
@@ -372,13 +374,13 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
 
     // 4. 考察文はAIに依頼（失敗時は決定的テキストにフォールバック）
     const commentary =
-      (await requestGeminiCommentary(body, result, remainingModules, context.env)) ??
+      (await requestCommentary(body, result, remainingModules, context.env)) ??
       deterministicCommentary(body, result, remainingModules);
 
     return json(
       {
         suggestion: { ...commentary, assignments },
-        model: context.env.GEMINI_MODEL || DEFAULT_MODEL,
+        model: context.env.OPENAI_MODEL || DEFAULT_MODEL,
         voltagePreference,
       },
       {
@@ -391,7 +393,7 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   } catch (error) {
     if (error instanceof Error && error.name === 'AbortError') {
       return json(
-        { error: `Gemini API が ${REQUEST_TIMEOUT_MS / 1000} 秒以内に応答しませんでした。タイムアウトしました。` },
+        { error: `OpenAI API が ${REQUEST_TIMEOUT_MS / 1000} 秒以内に応答しませんでした。タイムアウトしました。` },
         {
           status: 504,
           headers: {
