@@ -11,6 +11,8 @@ export type PanelSpec = {
   moduleCount: number;  // 総枚数
 };
 
+export type PanelPreset = Omit<PanelSpec, 'moduleCount'>;
+
 export type PcsSpec = {
   id: string;           // "PCS1" など内部ID
   manufacturer: string;
@@ -18,6 +20,7 @@ export type PcsSpec = {
   ratedPower: number;   // 定格容量 [W]
   totalCircuits: number;
   mpptCount: number;    // MPPTの数
+  ratedInputVoltage?: number; // 定格入力電圧 [V]（推奨直列数の基準）
   startupVoltage: number;   // 起動電圧 [V]
   mpptMinVoltage: number;   // MPPT動作下限 [V]
   mpptMaxVoltage: number;   // MPPT動作上限 [V]
@@ -26,7 +29,12 @@ export type PcsSpec = {
   maxIscPerCircuit: number;          // 最大短絡電流(回路) [A]
   maxIscTotal: number;               // 最大短絡電流(PCS) [A]
   efficiency: number;   // 変換効率 [%]
+  manualCircuitEnabled?: boolean;   // 回路構成を手動指定するか
+  manualSeriesModules?: number;     // 手動指定: 直列数（1回路あたり直列枚数）
+  manualParallelCount?: number;     // 手動指定: 並列数（=回路数として解釈）
 };
+
+export type PcsPreset = Omit<PcsSpec, 'id'>;
 
 export type SiteCondition = {
   minTemperature: number; // 想定最低温度 [°C]
@@ -66,4 +74,36 @@ export type DesignResult = {
   totalPvCapacityKw: number;
   totalPcsCapacityKw: number;
   globalWarnings: string[];
+};
+
+export type AiDesignRequest = {
+  panel: PanelSpec;
+  pcsList: PcsSpec[];
+  condition: SiteCondition;
+  baselineResult: DesignResult;
+};
+
+export type AiAssignment = {
+  pcsId: string;
+  circuitIndex: number;
+  seriesModules: number;
+};
+
+export type AiDesignSuggestion = {
+  summary: string;
+  reasoning: string[];
+  warnings: string[];
+  assignments: AiAssignment[];
+};
+
+export type AiDesignResponse = {
+  suggestion: AiDesignSuggestion;
+  model: string;
+};
+
+export type CustomPresetBundle = {
+  version: number;
+  exportedAt: string;
+  panelPresets: PanelPreset[];
+  pcsPresets: PcsPreset[];
 };

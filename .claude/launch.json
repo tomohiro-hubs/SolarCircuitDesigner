@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "static",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["vite", "preview", "--port", "4173", "--host"],
+      "port": 4173
+    },
+    {
+      "name": "standalone-html",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["vite", "--port", "4174", "--host"],
+      "port": 4174
+    }
+  ]
+}

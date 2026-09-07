@@ -1,16 +1,27 @@
 import React from 'react';
-import { PcsSpec } from '../types';
-import { Zap, Plus, Trash2, Settings2 } from 'lucide-react';
+import { PcsPreset, PcsSpec } from '../types';
+import { Zap, Plus, Trash2, Settings2, Save } from 'lucide-react';
 import { InputField } from './ui/InputField';
 
 interface Props {
   pcsList: PcsSpec[];
+  presets: PcsPreset[];
   onAdd: () => void;
   onRemove: (id: string) => void;
-  onChange: (id: string, field: keyof PcsSpec, value: string | number) => void;
+  onChange: (id: string, field: keyof PcsSpec, value: string | number | boolean) => void;
+  onPresetSelect: (id: string, model: string) => void;
+  onSaveCustom: (id: string) => void;
 }
 
-export const PcsListForm: React.FC<Props> = ({ pcsList, onAdd, onRemove, onChange }) => {
+export const PcsListForm: React.FC<Props> = ({
+  pcsList,
+  presets,
+  onAdd,
+  onRemove,
+  onChange,
+  onPresetSelect,
+  onSaveCustom,
+}) => {
   const handleChange = (id: string, e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type } = e.target;
     const val = type === 'number' ? parseFloat(value) : value;
@@ -59,6 +70,38 @@ export const PcsListForm: React.FC<Props> = ({ pcsList, onAdd, onRemove, onChang
             </div>
 
             <div className="p-6">
+              <div className="mb-6 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-500">
+                  保存済みPCS項目
+                </label>
+                <div className="flex flex-col gap-3 md:flex-row">
+                  <select
+                    className="block w-full rounded-md border-0 bg-white py-2 px-3 text-sm text-slate-900 ring-1 ring-inset ring-slate-300 transition-all duration-200 ease-in-out hover:ring-slate-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600"
+                    value=""
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        onPresetSelect(pcs.id, e.target.value);
+                      }
+                    }}
+                  >
+                    <option value="">保存済み項目を選択して反映</option>
+                    {presets.map((preset) => (
+                      <option key={preset.model} value={preset.model}>
+                        {preset.manufacturer} | {preset.model} ({(preset.ratedPower / 1000).toFixed(2)}kW)
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => onSaveCustom(pcs.id)}
+                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-700 transition-colors hover:bg-indigo-100"
+                  >
+                    <Save size={16} />
+                    現在値を保存
+                  </button>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-6">
                 
                 {/* Left Column: 基本スペック */}
@@ -85,13 +128,29 @@ export const PcsListForm: React.FC<Props> = ({ pcsList, onAdd, onRemove, onChang
                     />
                   </div>
 
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-2 gap-3">
                     <InputField
                       label="定格容量"
                       name="ratedPower"
                       type="number"
                       unit="W"
                       value={pcs.ratedPower || ''}
+                      onChange={(e) => handleChange(pcs.id, e)}
+                    />
+                    <InputField
+                      label="変換効率"
+                      name="efficiency"
+                      type="number"
+                      unit="%"
+                      value={pcs.efficiency || ''}
+                      onChange={(e) => handleChange(pcs.id, e)}
+                    />
+                    <InputField
+                      label="定格入力電圧"
+                      name="ratedInputVoltage"
+                      type="number"
+                      unit="V"
+                      value={pcs.ratedInputVoltage || ''}
                       onChange={(e) => handleChange(pcs.id, e)}
                     />
                     <InputField
@@ -109,6 +168,39 @@ export const PcsListForm: React.FC<Props> = ({ pcsList, onAdd, onRemove, onChang
                       value={pcs.mpptCount || ''}
                       onChange={(e) => handleChange(pcs.id, e)}
                     />
+                  </div>
+
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-3">
+                    <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={!!pcs.manualCircuitEnabled}
+                        onChange={(e) => onChange(pcs.id, 'manualCircuitEnabled', e.target.checked)}
+                        className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600"
+                      />
+                      回路構成を手動指定
+                    </label>
+                    {pcs.manualCircuitEnabled && (
+                      <div className="grid grid-cols-2 gap-3">
+                        <InputField
+                          label="直列数"
+                          name="manualSeriesModules"
+                          type="number"
+                          unit="枚"
+                          value={pcs.manualSeriesModules || ''}
+                          onChange={(e) => handleChange(pcs.id, e)}
+                        />
+                        <InputField
+                          label="並列数"
+                          name="manualParallelCount"
+                          type="number"
+                          unit="回路"
+                          value={pcs.manualParallelCount || ''}
+                          onChange={(e) => handleChange(pcs.id, e)}
+                          helperText="並列数=回路数として扱います（各回路が直列数の枚数で構成されます）"
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
 

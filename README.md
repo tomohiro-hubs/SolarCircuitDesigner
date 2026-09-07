@@ -32,6 +32,11 @@ React + Tailwind CSS で構築されており、サーバサイド処理を必�
 *   **Excelエクスポート**: 設計サマリー、詳細な回路割付表を含むExcelファイル(.xlsx)を出力可能。
 *   **設計ガイド**: 電圧・電流設計の妥当性を判定するガイドパネルを表示。
 
+### 5. AI自動設計
+*   **AI提案生成**: 現在の入力値と既存の計算結果をもとに、AIが割付案と考察を返します。
+*   **確認後に適用**: AI案は即反映せず、提案内容を確認してから回路割付表へ反映できます。
+*   **安全側の検証**: サーバー側で構造化JSONと制約チェックを行い、違反案は適用しません。
+
 ## 技術スタック
 *   **Frontend**: React 18, Tailwind CSS (CDN)
 *   **Logic**: JavaScript (ES6+)
@@ -58,3 +63,36 @@ React + Tailwind CSS で構築されており、サーバサイド処理を必�
 ## 開発者向け情報
 本ツールは `Babel Standalone` を使用してブラウザ内でJSXをトランスパイルしています。
 本番環境で高速化・軽量化が必要な場合は、Create React App や Vite 等を使用したビルド環境への移行を推奨します。
+
+## AI自動設計のセットアップ
+AI自動設計はフロントから直接 API キーを扱わず、サーバーレス関数経由で OpenAI API を呼び出します。
+
+### 必要な環境変数
+*   `OPENAI_API_KEY`: サーバーレス環境に設定する OpenAI API キー
+*   `OPENAI_MODEL`: 任意。未指定時は `gpt-5.6-luna`
+*   `VITE_AI_DESIGN_ENDPOINT`: 任意。フロントから呼び出す AI API の URL。未指定時は `/api/ai-design`
+
+### 前提
+*   `OPENAI_API_KEY` は `VITE_` プレフィックス付きでフロントに渡さないでください。
+*   GitHub Pages のような静的配信だけでは `api/ai-design.ts` は動きません。
+*   Vercel / Netlify / Cloudflare Workers など、サーバーレス関数を持てる環境での公開を前提にしてください。
+
+## Cloudflare での API キー保管
+Cloudflare に載せる場合は、`OPENAI_API_KEY` をコードや `wrangler.jsonc` に書かず、Cloudflare Secret として登録してください。Secret は Cloudflare 側で暗号化保管され、`functions/api/ai-design.ts` からだけ参照されます。
+
+### 追加したファイル
+*   `wrangler.jsonc`: Cloudflare Pages 用の設定
+*   `functions/api/ai-design.ts`: Cloudflare Pages Functions 版の AI API
+*   `.dev.vars.example`: ローカル開発用の秘密情報サンプル
+
+### 手動で API キーを入れる方法
+1. `npm run build`
+2. `npx wrangler login`
+3. `echo "あなたのAPIキー" | npx wrangler pages secret put OPENAI_API_KEY --project-name solar-circuit-designer`
+
+### 任意のモデル指定
+`wrangler.jsonc` の `OPENAI_MODEL` を変更するか、Cloudflare 側の環境変数で上書きしてください。
+
+### ローカル確認
+*   `.dev.vars` を作成して `OPENAI_API_KEY=...` を入れる
+*   `npx wrangler pages dev dist`

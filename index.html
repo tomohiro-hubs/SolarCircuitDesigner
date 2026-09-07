@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- Deployed via GitHub Actions (index.html/CNAME 変更時のみ再デプロイ) -->
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
@@ -40,6 +41,16 @@
 
   <script type="text/babel" data-presets="env,react">
     const { useState, useCallback, useMemo, useEffect, useRef } = React;
+
+    // ==========================================
+    // AI自動設計 API エンドポイント
+    // GitHub Pages は静的配信のため /api/ai-design を実行できない。
+    // Cloudflare Pages / Vercel などにデプロイした API の絶対URLをここに設定する。
+    // （同一オリジンで動かす場合のみ空文字にして相対パス '/api/ai-design' を使う）
+    // 例: 'https://solar-circuit-designer.pages.dev'
+    // ==========================================
+    const AI_API_BASE = 'https://solar-circuit-designer.pages.dev';
+    const AI_DESIGN_ENDPOINT = (AI_API_BASE ? AI_API_BASE.replace(/\/$/, '') : '') + '/api/ai-design';
 
     // ==========================================
     // Data Source: Panel Presets
@@ -379,8 +390,11 @@
         maxIscPerCircuit: Number(pcs.maxIscPerCircuit) || 0,
         maxIscTotal: Number(pcs.maxIscTotal) || 0,
         efficiency: Number(pcs.efficiency) || 0,
+        manualCircuitEnabled: !!pcs.manualCircuitEnabled,
+        manualSeriesModules: Number(pcs.manualSeriesModules) || 0,
+        manualParallelCount: Number(pcs.manualParallelCount) || 0,
       }));
-      
+
       // Design Constraint: Voc at Min Temp (Worst Case for Safety)
       const vocColdModule = calculateVocCold(panel, condition.minTemperature);
       
@@ -414,61 +428,94 @@
         vocStringSpot: vocSpotUnit * seriesCount // Add Spot Voc for reference
       };
 
+      // 手動指定PCSの回路構成を先に確定する
+      const manualInfoMap = new Map(); // pcsId -> { usedCircuits, stringDesign, seriesModules }
+      let totalManualModules = 0;
+
+      for (const pcs of pcsList) {
+        if (pcs.manualCircuitEnabled && pcs.manualSeriesModules > 0) {
+          const mSeries = pcs.manualSeriesModules;
+          const usedCircuits = Math.max(0, Math.min(Math.floor(pcs.manualParallelCount) || 0, pcs.totalCircuits));
+          const manualStringDesign = {
+            seriesModules: mSeries,
+            vmpString: vmpSpotUnit * mSeries,
+            vocStringCold: vocColdModule * mSeries,
+            vocStringSpot: vocSpotUnit * mSeries
+          };
+          manualInfoMap.set(pcs.id, { usedCircuits, stringDesign: manualStringDesign, seriesModules: mSeries });
+          totalManualModules += mSeries * usedCircuits;
+        }
+      }
+
       // 割り当てロジック (Round-Robin)
-      let remainingModules = panel.moduleCount;
       const assignments = [];
       const summaries = [];
 
       let totalPvCapacityW = 0;
       let totalPcsCapacityW = 0;
-      
-      const totalStrings = seriesCount > 0 ? Math.floor(panel.moduleCount / seriesCount) : 0;
-      remainingModules -= totalStrings * seriesCount;
 
-      // マップ準備
+      let modulePool = panel.moduleCount - totalManualModules;
+      let manualPoolExceeded = false;
+      if (modulePool < 0) {
+        globalWarnings.push(`警告: 手動指定を含む割当枚数がパネル総数(${panel.moduleCount}枚)を超えています。`);
+        modulePool = 0;
+        manualPoolExceeded = true;
+      }
+
+      const totalStrings = seriesCount > 0 ? Math.floor(modulePool / seriesCount) : 0;
+      let remainingModules = modulePool - totalStrings * seriesCount;
+
+      // 自動割り当て対象のPCS (手動指定PCSを除く)
+      const autoPcsList = pcsList.filter(pcs => !manualInfoMap.has(pcs.id));
+
+      // マップ準備 (自動割り当て分のみ)
       const assignedMap = new Map();
-      const nextCircuitIndex = pcsList.map(() => 1); 
+      const nextCircuitIndex = new Map(autoPcsList.map(pcs => [pcs.id, 1]));
       let stringsToAssign = totalStrings;
-      
+
       while (stringsToAssign > 0) {
         let assignedInThisRound = false;
-        for (let i = 0; i < pcsList.length; i++) {
+        for (const pcs of autoPcsList) {
             if (stringsToAssign <= 0) break;
-            const pcs = pcsList[i];
-            const circuitIdx = nextCircuitIndex[i];
+            const circuitIdx = nextCircuitIndex.get(pcs.id) ?? 1;
             if (circuitIdx <= pcs.totalCircuits) {
                 assignedMap.set(`${pcs.id}-${circuitIdx}`, true);
-                nextCircuitIndex[i]++;
+                nextCircuitIndex.set(pcs.id, circuitIdx + 1);
                 stringsToAssign--;
                 assignedInThisRound = true;
             }
         }
         if (!assignedInThisRound) break;
       }
-      
+
       if (stringsToAssign > 0) {
           remainingModules += stringsToAssign * seriesCount;
       }
 
       // 結果構築
       for (const pcs of pcsList) {
-        const pcsAssignments = []; 
+        const pcsAssignments = [];
         let modulesAssignedToPcs = 0;
         let usedCircuits = 0;
         let pcsWarnings = [];
-        
+
+        const manualInfo = manualInfoMap.get(pcs.id);
+        // このPCSに適用するストリング設計 (手動指定PCSは自身の直列数を使用)
+        const effectiveStringDesign = manualInfo ? manualInfo.stringDesign : stringDesign;
+        const effectiveSeriesCount = manualInfo ? manualInfo.seriesModules : seriesCount;
+
         // 電圧チェック (SAFETY: Cold Voc, SPOT: Spot Vmp)
-        if (seriesCount > 0) {
+        if (effectiveSeriesCount > 0) {
             // Check 1: Safety (Max Input Voltage vs Cold Voc)
-            if (stringDesign.vocStringCold > pcs.maxInputVoltage) {
-                pcsWarnings.push(`警告: 低温時開放電圧(${stringDesign.vocStringCold.toFixed(1)}V)が最大入力(${pcs.maxInputVoltage}V)超過`);
+            if (effectiveStringDesign.vocStringCold > pcs.maxInputVoltage) {
+                pcsWarnings.push(`警告: 低温時開放電圧(${effectiveStringDesign.vocStringCold.toFixed(1)}V)が最大入力(${pcs.maxInputVoltage}V)超過`);
             }
             // Check 2: Performance (MPPT Range vs Spot Vmp)
-            if (stringDesign.vmpString < pcs.mpptMinVoltage) {
-                pcsWarnings.push(`警告: 動作電圧(${stringDesign.vmpString.toFixed(1)}V @${spotT}℃)がMPPT下限(${pcs.mpptMinVoltage}V)未満`);
+            if (effectiveStringDesign.vmpString < pcs.mpptMinVoltage) {
+                pcsWarnings.push(`警告: 動作電圧(${effectiveStringDesign.vmpString.toFixed(1)}V @${spotT}℃)がMPPT下限(${pcs.mpptMinVoltage}V)未満`);
             }
-            if (stringDesign.vmpString > pcs.mpptMaxVoltage) {
-                pcsWarnings.push(`警告: 動作電圧(${stringDesign.vmpString.toFixed(1)}V @${spotT}℃)がMPPT上限(${pcs.mpptMaxVoltage}V)超過`);
+            if (effectiveStringDesign.vmpString > pcs.mpptMaxVoltage) {
+                pcsWarnings.push(`警告: 動作電圧(${effectiveStringDesign.vmpString.toFixed(1)}V @${spotT}℃)がMPPT上限(${pcs.mpptMaxVoltage}V)超過`);
             }
         }
 
@@ -476,15 +523,23 @@
 
         for (let i = 1; i <= pcs.totalCircuits; i++) {
           const mpptGroupIndex = Math.ceil(i / circuitsPerMppt);
-          const isAssigned = assignedMap.get(`${pcs.id}-${i}`);
           let assignedString = null;
 
-          if (isAssigned) {
-            assignedString = { ...stringDesign };
-            modulesAssignedToPcs += seriesCount;
-            usedCircuits++;
-          } 
-          
+          if (manualInfo) {
+            if (i <= manualInfo.usedCircuits) {
+              assignedString = { ...manualInfo.stringDesign };
+              modulesAssignedToPcs += manualInfo.seriesModules;
+              usedCircuits++;
+            }
+          } else {
+            const isAssigned = assignedMap.get(`${pcs.id}-${i}`);
+            if (isAssigned) {
+              assignedString = { ...stringDesign };
+              modulesAssignedToPcs += seriesCount;
+              usedCircuits++;
+            }
+          }
+
           const assignmentData = {
             pcsId: pcs.id,
             circuitIndex: i,
@@ -494,9 +549,9 @@
             currentImp: assignedString ? impSpotUnit : 0,
             currentIsc: assignedString ? iscSpotUnit : 0
           };
-          
+
           assignments.push(assignmentData);
-          if (isAssigned) {
+          if (assignedString) {
              pcsAssignments.push(assignmentData);
           }
         }
@@ -532,6 +587,14 @@
             pcsWarnings.push(`情報: 過積載率(${overloadRatioSTC.toFixed(1)}%)が目標(${condition.targetOverloadRatio}%)より大幅に低いです`);
         }
 
+        // 手動指定PCSの直列数が推奨範囲内かチェック
+        if (manualInfo) {
+          const manualRange = calculateAllowedSeriesRange(panel, pcs, vocColdModule);
+          if (manualInfo.seriesModules < manualRange.min || manualInfo.seriesModules > manualRange.max) {
+            pcsWarnings.push(`警告: ${pcs.id} の手動直列数(${manualInfo.seriesModules})が推奨範囲(${manualRange.min}〜${manualRange.max}枚)外です`);
+          }
+        }
+
         // 重複警告の削除
         pcsWarnings = [...new Set(pcsWarnings)];
 
@@ -548,7 +611,7 @@
         totalPcsCapacityW += pcs.ratedPower;
       }
 
-      if (remainingModules > 0) {
+      if (remainingModules > 0 && !manualPoolExceeded) {
         globalWarnings.push(`注意: ${remainingModules} 枚のパネルが配置されずに残っています。PCSを追加するか構成を見直してください。`);
       }
 
@@ -833,14 +896,14 @@
     };
 
     // --- PCS List Form (Updated) ---
-    const PcsListForm = ({ pcsList, onAdd, onBulkAdd, onRemove, onChange, onPresetSelect }) => {
+    const PcsListForm = ({ pcsList, onAdd, onBulkAdd, onRemove, onChange, onPresetSelect, presets = PCS_PRESETS, onSaveCustom }) => {
       const [bulkCount, setBulkCount] = useState(1);
 
       return (
       <section className="space-y-4">
         {pcsList.map((pcs, index) => {
-           // Check if current model matches a preset
-           const isCustom = !PCS_PRESETS.some(p => p.model === pcs.model);
+           // Check if current model matches a preset (default or custom saved)
+           const isCustom = !presets.some(p => p.model === pcs.model);
            
            return (
           <div key={pcs.id} className="bg-white rounded-xl p-6 shadow-sm border border-slate-200 relative group">
@@ -866,7 +929,7 @@
                 onChange={(e) => onPresetSelect(pcs.id, e.target.value)}
               >
                 <option value="" disabled>モデルを選択してください</option>
-                {PCS_PRESETS.map(p => (
+                {presets.map(p => (
                   <option key={p.model} value={p.model}>{p.manufacturer} | {p.model} ({p.ratedPower/1000}kW)</option>
                 ))}
                 <option value="CUSTOM">カスタム (手動入力)</option>
@@ -889,10 +952,48 @@
               <InputField label="最大入力電圧" value={pcs.maxInputVoltage} onChange={(v) => onChange(pcs.id, 'maxInputVoltage', v)} unit="V" disabled={!isCustom} />
               <InputField label="最大入力電流/回路" value={pcs.maxInputCurrentPerCircuit} onChange={(v) => onChange(pcs.id, 'maxInputCurrentPerCircuit', v)} unit="A" disabled={!isCustom} />
               <InputField label="最大短絡電流/回路" value={pcs.maxIscPerCircuit} onChange={(v) => onChange(pcs.id, 'maxIscPerCircuit', v)} unit="A" disabled={!isCustom} />
+              <InputField label="最大短絡電流/PCS合計" value={pcs.maxIscTotal} onChange={(v) => onChange(pcs.id, 'maxIscTotal', v)} unit="A" disabled={!isCustom} />
+
+              {/* Save Button for Custom PCS */}
+              {isCustom && onSaveCustom && (
+                <div className="flex items-end">
+                  <button
+                    onClick={() => onSaveCustom(pcs.id)}
+                    className="h-[42px] w-full bg-indigo-50 text-indigo-600 border border-indigo-200 rounded-lg font-bold text-xs hover:bg-indigo-100 transition-colors flex items-center justify-center gap-1"
+                    title="入力した内容をブラウザに保存します"
+                  >
+                    <i className="fa-solid fa-save"></i>
+                    プリセット保存
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4 space-y-3">
+              <label className="flex items-center gap-2 text-xs font-bold text-slate-700 uppercase tracking-wider cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={!!pcs.manualCircuitEnabled}
+                  onChange={(e) => onChange(pcs.id, 'manualCircuitEnabled', e.target.checked)}
+                  className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600"
+                />
+                回路構成を手動指定
+              </label>
+              {pcs.manualCircuitEnabled && (
+                <div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <InputField label="直列数" value={pcs.manualSeriesModules} onChange={(v) => onChange(pcs.id, 'manualSeriesModules', v)} unit="枚" />
+                    <InputField label="並列数" value={pcs.manualParallelCount} onChange={(v) => onChange(pcs.id, 'manualParallelCount', v)} unit="回路" />
+                  </div>
+                  <p className="text-xs text-slate-500 mt-2">
+                    ※ 並列数=回路数として扱います（各回路が直列数の枚数で構成されます）
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         );})}
-        
+
         <div className="flex flex-col sm:flex-row gap-2">
             <button onClick={onAdd} className="flex-1 py-3 border-2 border-dashed border-slate-300 rounded-xl text-slate-500 font-bold hover:border-indigo-400 hover:text-indigo-500 hover:bg-indigo-50 transition-all flex items-center justify-center gap-2">
               <i className="fa-solid fa-plus"></i>
@@ -1879,7 +1980,8 @@
       manufacturer: '', model: '', voc: '', vmp: '', isc: '', imp: '', pmax: '', tempCoeffVoc: '', tempCoeffIsc: '', tempCoeffPmax: '', moduleCount: ''
     };
     const INITIAL_PCS = {
-      id: 'PCS1', manufacturer: '', model: '', ratedPower: '', totalCircuits: '', mpptCount: '', startupVoltage: '', mpptMinVoltage: '', mpptMaxVoltage: '', maxInputVoltage: '', maxInputCurrentPerCircuit: '', maxIscPerCircuit: '', maxIscTotal: '', efficiency: ''
+      id: 'PCS1', manufacturer: '', model: '', ratedPower: '', totalCircuits: '', mpptCount: '', ratedInputVoltage: '', startupVoltage: '', mpptMinVoltage: '', mpptMaxVoltage: '', maxInputVoltage: '', maxInputCurrentPerCircuit: '', maxIscPerCircuit: '', maxIscTotal: '', efficiency: '',
+      manualCircuitEnabled: false, manualSeriesModules: '', manualParallelCount: ''
     };
     const INITIAL_CONDITION = {
       minTemperature: -10, targetOverloadRatio: 145, manualSeriesCount: 0
@@ -1890,6 +1992,7 @@
       const rightPanelRef = useRef(null);
       const [projectName, setProjectName] = useState('');
       const [panelPresets, setPanelPresets] = useState([]);
+      const [pcsPresets, setPcsPresets] = useState(PCS_PRESETS);
       const [panel, setPanel] = useState(INITIAL_PANEL);
       
       const [spotCondition, setSpotCondition] = useState({
@@ -1902,6 +2005,14 @@
         const stored = localStorage.getItem('customPanelPresets');
         const customs = stored ? JSON.parse(stored) : [];
         setPanelPresets([...DEFAULT_PANEL_PRESETS, ...customs]);
+
+        try {
+          const storedPcs = localStorage.getItem('customPcsPresets');
+          const pcsCustoms = storedPcs ? JSON.parse(storedPcs) : [];
+          setPcsPresets([...PCS_PRESETS, ...pcsCustoms]);
+        } catch (e) {
+          setPcsPresets(PCS_PRESETS);
+        }
       }, []);
 
       const handleSaveCustomPanel = useCallback(() => {
@@ -1941,6 +2052,11 @@
       const [result, setResult] = useState(null);
       const [isCalculating, setIsCalculating] = useState(false);
       const [manualAssignments, setManualAssignments] = useState(null);
+      const [aiSuggestion, setAiSuggestion] = useState(null);
+      const [aiStatus, setAiStatus] = useState('idle');
+      const [aiErrorMessage, setAiErrorMessage] = useState('');
+      const [aiVoltagePref, setAiVoltagePref] = useState('normal');
+      const [appliedBy, setAppliedBy] = useState('rule');
 
       const handlePanelChange = useCallback((field, value) => setPanel(prev => ({ ...prev, [field]: value })), []);
       
@@ -1966,7 +2082,12 @@
       
       const handleAddPcs = useCallback(() => setPcsList(prev => {
         const lastPcs = prev[prev.length - 1];
-        const baseData = lastPcs ? { ...lastPcs } : { ...INITIAL_PCS };
+        // 先頭PCS(PCS1)が手動指定ONなら、その直列/並列設定を複製する。OFFなら既定にリセット。
+        const firstPcs = prev[0];
+        const manualCfg = firstPcs && firstPcs.manualCircuitEnabled
+          ? { manualCircuitEnabled: true, manualSeriesModules: firstPcs.manualSeriesModules, manualParallelCount: firstPcs.manualParallelCount }
+          : { manualCircuitEnabled: false, manualSeriesModules: '', manualParallelCount: '' };
+        const baseData = { ...(lastPcs ? { ...lastPcs } : { ...INITIAL_PCS }), ...manualCfg };
         
         let currentMaxIdNum = 0;
         prev.forEach(p => {
@@ -1986,8 +2107,16 @@
 
       const handleBulkAddPcs = useCallback((count) => setPcsList(prev => {
         const lastPcs = prev[prev.length - 1];
-        const baseData = lastPcs ? { ...lastPcs } : { ...INITIAL_PCS };
-        
+        // 先頭PCS(PCS1)が手動指定ONなら、その直列/並列設定を複製する。OFFなら既定にリセット。
+        const firstPcs = prev[0];
+        const manualCfg = firstPcs && firstPcs.manualCircuitEnabled
+          ? { manualCircuitEnabled: true, manualSeriesModules: firstPcs.manualSeriesModules, manualParallelCount: firstPcs.manualParallelCount }
+          : { manualCircuitEnabled: false, manualSeriesModules: '', manualParallelCount: '' };
+        const baseData = {
+          ...(lastPcs ? { ...lastPcs } : { ...INITIAL_PCS }),
+          ...manualCfg
+        };
+
         let newPcsList = [...prev];
         let currentMaxIdNum = 0;
         
@@ -2036,19 +2165,164 @@
                 efficiency: '',
                 totalCircuits: '',
                 mpptCount: '',
+                ratedInputVoltage: '',
                 startupVoltage: '',
                 mpptMinVoltage: '',
                 mpptMaxVoltage: '',
                 maxInputVoltage: '',
                 maxInputCurrentPerCircuit: '',
-                maxIscPerCircuit: ''
+                maxIscPerCircuit: '',
+                maxIscTotal: ''
             } : pcs));
         } else {
-            const preset = PCS_PRESETS.find(p => p.model === modelName);
+            const preset = pcsPresets.find(p => p.model === modelName);
             if (preset) {
                 setPcsList(prev => prev.map(pcs => pcs.id === id ? { ...pcs, ...preset } : pcs));
             }
         }
+      }, [pcsPresets]);
+
+      // カスタム入力したPCSをブラウザにプリセット保存する
+      const handleSaveCustomPcs = useCallback((id) => {
+        const pcs = pcsList.find(p => p.id === id);
+        if (!pcs) return;
+        if (!pcs.manufacturer || !pcs.model) {
+          alert('保存するにはメーカーと型式を入力してください');
+          return;
+        }
+        const num = (v) => (v === '' || v === null || v === undefined ? v : Number(v));
+        const newPreset = {
+          manufacturer: pcs.manufacturer,
+          model: pcs.model,
+          ratedPower: num(pcs.ratedPower),
+          totalCircuits: num(pcs.totalCircuits),
+          mpptCount: num(pcs.mpptCount),
+          ratedInputVoltage: num(pcs.ratedInputVoltage),
+          startupVoltage: num(pcs.startupVoltage),
+          maxInputVoltage: num(pcs.maxInputVoltage),
+          mpptMinVoltage: num(pcs.mpptMinVoltage),
+          mpptMaxVoltage: num(pcs.mpptMaxVoltage),
+          maxInputCurrentPerCircuit: num(pcs.maxInputCurrentPerCircuit),
+          maxIscPerCircuit: num(pcs.maxIscPerCircuit),
+          maxIscTotal: num(pcs.maxIscTotal),
+          efficiency: num(pcs.efficiency)
+        };
+
+        let customs = [];
+        try {
+          const stored = localStorage.getItem('customPcsPresets');
+          customs = stored ? JSON.parse(stored) : [];
+        } catch (e) { customs = []; }
+
+        // 同一型式は上書き。既定プリセットと同名の場合は保存不可。
+        if (PCS_PRESETS.some(p => p.model === newPreset.model)) {
+          alert(`「${newPreset.model}」は既定プリセットと同じ型式名です。別の型式名にしてください`);
+          return;
+        }
+        const filtered = customs.filter(p => p.model !== newPreset.model);
+        const updatedCustoms = [...filtered, newPreset];
+
+        localStorage.setItem('customPcsPresets', JSON.stringify(updatedCustoms));
+        setPcsPresets([...PCS_PRESETS, ...updatedCustoms]);
+        alert(`カスタムPCS「${newPreset.model}」をブラウザに保存しました`);
+      }, [pcsList]);
+
+      // --- カスタム項目(パネル/PCS)の書き出し・取り込み ---
+      // ブラウザに保存したカスタムのパネル/PCSプリセットを JSON で入出力する。
+      // 割付・計算ロジックには一切手を加えない（プリセットの永続化データのみを扱う）。
+      const importPresetInputRef = useRef(null);
+
+      const readCustomPresets = (key) => {
+        try {
+          const stored = localStorage.getItem(key);
+          return stored ? JSON.parse(stored) : [];
+        } catch (e) { return []; }
+      };
+
+      const handleExportCustomPresets = useCallback(() => {
+        const panelCustoms = readCustomPresets('customPanelPresets');
+        const pcsCustoms = readCustomPresets('customPcsPresets');
+        if (panelCustoms.length === 0 && pcsCustoms.length === 0) {
+          alert('書き出せるカスタム項目がありません。先にパネルやPCSの「プリセット保存」で保存してください。');
+          return;
+        }
+        const payload = {
+          version: 1,
+          exportedAt: new Date().toISOString(),
+          panelPresets: panelCustoms,
+          pcsPresets: pcsCustoms
+        };
+        const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `solar-custom-presets-${new Date().toISOString().slice(0, 10)}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, []);
+
+      const handleImportCustomPresets = useCallback((file) => {
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          try {
+            const parsed = JSON.parse(e.target.result);
+            const panelSrc = Array.isArray(parsed.panelPresets) ? parsed.panelPresets
+              : Array.isArray(parsed.panels) ? parsed.panels : [];
+            const pcsSrc = Array.isArray(parsed.pcsPresets) ? parsed.pcsPresets
+              : Array.isArray(parsed.pcs) ? parsed.pcs : [];
+
+            const defaultPanelModels = new Set(DEFAULT_PANEL_PRESETS.map(p => p.model));
+            const defaultPcsModels = new Set(PCS_PRESETS.map(p => p.model));
+            const warnings = [];
+
+            let panelCustoms = readCustomPresets('customPanelPresets');
+            let addedPanel = 0;
+            panelSrc.forEach((item) => {
+              if (!item || !item.model || !item.manufacturer) { warnings.push('必須項目が不足したパネルをスキップしました'); return; }
+              if (defaultPanelModels.has(item.model)) { warnings.push(`パネル「${item.model}」は既定項目と重複のためスキップ`); return; }
+              panelCustoms = panelCustoms.filter(p => p.model !== item.model);
+              panelCustoms.push(item);
+              addedPanel += 1;
+            });
+
+            let pcsCustoms = readCustomPresets('customPcsPresets');
+            let addedPcs = 0;
+            pcsSrc.forEach((item) => {
+              if (!item || !item.model || !item.manufacturer) { warnings.push('必須項目が不足したPCSをスキップしました'); return; }
+              if (defaultPcsModels.has(item.model)) { warnings.push(`PCS「${item.model}」は既定項目と重複のためスキップ`); return; }
+              pcsCustoms = pcsCustoms.filter(p => p.model !== item.model);
+              pcsCustoms.push(item);
+              addedPcs += 1;
+            });
+
+            localStorage.setItem('customPanelPresets', JSON.stringify(panelCustoms));
+            localStorage.setItem('customPcsPresets', JSON.stringify(pcsCustoms));
+            setPanelPresets([...DEFAULT_PANEL_PRESETS, ...panelCustoms]);
+            setPcsPresets([...PCS_PRESETS, ...pcsCustoms]);
+
+            let msg = `取り込み完了: パネル ${addedPanel}件 / PCS ${addedPcs}件`;
+            if (warnings.length > 0) msg += `\n${warnings.join('\n')}`;
+            alert(msg);
+          } catch (err) {
+            alert('JSONの読み込みに失敗しました。ファイル形式をご確認ください。');
+          }
+        };
+        reader.readAsText(file);
+      }, []);
+
+      const handleDeleteCustomPanel = useCallback((model) => {
+        const next = readCustomPresets('customPanelPresets').filter(p => p.model !== model);
+        localStorage.setItem('customPanelPresets', JSON.stringify(next));
+        setPanelPresets([...DEFAULT_PANEL_PRESETS, ...next]);
+      }, []);
+
+      const handleDeleteCustomPcs = useCallback((model) => {
+        const next = readCustomPresets('customPcsPresets').filter(p => p.model !== model);
+        localStorage.setItem('customPcsPresets', JSON.stringify(next));
+        setPcsPresets([...PCS_PRESETS, ...next]);
       }, []);
 
       const handleCalculate = () => {
@@ -2058,6 +2332,10 @@
             const res = calculateDesign(panel, pcsList, condition, spotCondition);
             setResult(res);
             setManualAssignments(null);
+            setAiSuggestion(null);
+            setAiStatus('idle');
+            setAiErrorMessage('');
+            setAppliedBy('rule');
           } catch (e) {
             console.error(e);
             alert('計算中にエラーが発生しました');
@@ -2094,7 +2372,46 @@
           return a;
         });
         setManualAssignments(newAssignments);
+        setAppliedBy('manual');
       }, [result, manualAssignments, panel, condition.minTemperature]);
+
+      const buildAssignmentsFromAiSuggestion = useCallback((suggestion) => {
+        const vocColdModule = calculateVocCold(panel, condition.minTemperature);
+        return pcsList.flatMap((pcs) => {
+          const circuitsPerMppt = Math.max(1, Math.ceil(pcs.totalCircuits / Math.max(pcs.mpptCount, 1)));
+          return Array.from({ length: pcs.totalCircuits }, (_, index) => {
+            const circuitIndex = index + 1;
+            const aiAssignment = suggestion.assignments.find(a => a.pcsId === pcs.id && a.circuitIndex === circuitIndex);
+            const seriesModules = aiAssignment ? Number(aiAssignment.seriesModules) || 0 : 0;
+            const stringDesign = seriesModules > 0 ? {
+              seriesModules,
+              vmpString: Number(panel.vmp) * seriesModules,
+              vocStringCold: vocColdModule * seriesModules
+            } : null;
+            return {
+              pcsId: pcs.id,
+              circuitIndex,
+              mpptGroupIndex: Math.ceil(circuitIndex / circuitsPerMppt),
+              stringDesign,
+              currentImp: stringDesign ? Number(panel.imp) : 0,
+              currentIsc: stringDesign ? Number(panel.isc) : 0
+            };
+          });
+        });
+      }, [panel, pcsList, condition.minTemperature]);
+
+      const applyAiSuggestion = useCallback(() => {
+        if (!aiSuggestion) return;
+        const nextAssignments = buildAssignmentsFromAiSuggestion(aiSuggestion);
+        setManualAssignments(nextAssignments);
+        setAppliedBy('ai');
+      }, [aiSuggestion, buildAssignmentsFromAiSuggestion]);
+
+      const dismissAiSuggestion = useCallback(() => {
+        setAiSuggestion(null);
+        setAiStatus('idle');
+        setAiErrorMessage('');
+      }, []);
 
       const scrollPanel = (ref, direction) => {
           if (ref.current) {
@@ -2230,6 +2547,67 @@
           };
       }, [result, manualAssignments, panel, pcsList, condition.targetOverloadRatio]);
 
+      const handleAiDesign = useCallback(async (voltagePreference = 'normal', autoApply = false) => {
+        // ボタンのonClickはイベントを渡すため、正規化する
+        const pref = (voltagePreference === 'high' || voltagePreference === 'low') ? voltagePreference : 'normal';
+        setAiStatus('loading');
+        setAiErrorMessage('');
+        setAiVoltagePref(pref);
+
+        try {
+          const baselineResult = finalResult || result || calculateDesign(panel, pcsList, condition, spotCondition);
+
+          if (!result) {
+            setResult(baselineResult);
+          }
+
+          const response = await fetch(AI_DESIGN_ENDPOINT, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              panel,
+              pcsList,
+              condition,
+              baselineResult,
+              voltagePreference: pref
+            })
+          });
+
+          const payload = await response.json();
+          if (!response.ok || !payload.suggestion) {
+            const detailMessage = Array.isArray(payload.details) && payload.details.length > 0
+              ? ` ${payload.details.join(' / ')}`
+              : '';
+            throw new Error((payload.error || 'AI自動設計の取得に失敗しました。') + detailMessage);
+          }
+
+          setAiSuggestion(payload.suggestion);
+          setAiStatus('success');
+
+          if (autoApply) {
+            // 電圧再検討ボタンからの再計算は即反映して比較しやすくする
+            const nextAssignments = buildAssignmentsFromAiSuggestion(payload.suggestion);
+            setManualAssignments(nextAssignments);
+            setAppliedBy('ai');
+          } else {
+            // 新しい提案を出したら「適用済み」状態はいったん解除
+            setAppliedBy(prev => (prev === 'ai' ? 'rule' : prev));
+          }
+        } catch (error) {
+          console.error(error);
+          setAiStatus('error');
+          setAiErrorMessage(error instanceof Error ? error.message : 'AI自動設計の取得に失敗しました。');
+        }
+      }, [condition, finalResult, panel, pcsList, result, spotCondition, buildAssignmentsFromAiSuggestion]);
+
+      // 保存済み（カスタム）項目の一覧。既定プリセットを除いたものを表示・削除対象とする。
+      const defaultPanelModelSet = new Set(DEFAULT_PANEL_PRESETS.map(p => p.model));
+      const customPanelList = panelPresets.filter(p => !defaultPanelModelSet.has(p.model));
+      const defaultPcsModelSet = new Set(PCS_PRESETS.map(p => p.model));
+      const customPcsList = pcsPresets.filter(p => !defaultPcsModelSet.has(p.model));
+
       return (
         <div className="min-h-screen flex flex-col">
           {/* Header */}
@@ -2244,9 +2622,22 @@
                   <span className="text-[10px] font-medium text-slate-500 uppercase tracking-wider">PV Plant Engineering Tool</span>
                 </div>
               </div>
-              <div className="hidden md:block text-xs text-slate-400 text-right">
-                <p>Last Updated: 2026.02.09</p>
-                <p>Version 1.3.2</p>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handleAiDesign}
+                  disabled={aiStatus === 'loading' || isCalculating}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-700 text-white text-sm font-bold shadow transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {aiStatus === 'loading' ? (
+                    <><i className="fa-solid fa-rotate fa-spin"></i> AI検討中...</>
+                  ) : (
+                    <><i className="fa-solid fa-wand-magic-sparkles"></i> AIで自動設計</>
+                  )}
+                </button>
+                <div className="hidden md:block text-xs text-slate-400 text-right">
+                  <p>Last Updated: 2026.07.27</p>
+                  <p>Version 1.5.0</p>
+                </div>
               </div>
             </div>
           </header>
@@ -2276,10 +2667,77 @@
                 </div>
 
                 <div ref={leftPanelRef} className="space-y-6 overflow-y-auto xl:h-full scrollbar-hide pb-4">
-                  <PanelForm 
-                      panel={panel} 
-                      onChange={handlePanelChange} 
-                      onPresetSelect={handlePanelPresetSelect} 
+                  {/* カスタム項目(パネル/PCS)の書き出し・取り込み */}
+                  <section className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
+                    <h2 className="flex items-center gap-2 text-lg font-bold text-slate-800 mb-1 pb-2 border-b border-slate-100">
+                      <i className="fa-solid fa-right-left text-emerald-500 text-xl"></i>
+                      カスタム項目の入出力
+                    </h2>
+                    <p className="text-xs text-slate-500 mb-4">ブラウザに保存したカスタムのパネル・PCS項目を JSON ファイルで書き出し／取り込みできます（別PC・別ブラウザへの移行に）。</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        onClick={handleExportCustomPresets}
+                        className="flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-bold transition-colors"
+                      >
+                        <i className="fa-solid fa-download"></i> 書き出し
+                      </button>
+                      <button
+                        onClick={() => importPresetInputRef.current && importPresetInputRef.current.click()}
+                        className="flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold transition-colors"
+                      >
+                        <i className="fa-solid fa-upload"></i> 取り込み
+                      </button>
+                    </div>
+                    <input
+                      ref={importPresetInputRef}
+                      type="file"
+                      accept="application/json,.json"
+                      className="hidden"
+                      onChange={(e) => { const f = e.target.files && e.target.files[0]; handleImportCustomPresets(f); e.target.value = ''; }}
+                    />
+
+                    <div className="mt-4 space-y-3">
+                      <div>
+                        <p className="text-xs font-bold text-slate-500 mb-1.5">保存済みパネル項目</p>
+                        {customPanelList.length === 0 ? (
+                          <p className="text-xs text-slate-400">まだありません（パネル欄の「プリセット保存」で追加）</p>
+                        ) : (
+                          <div className="flex flex-wrap gap-1.5">
+                            {customPanelList.map(p => (
+                              <span key={p.model} className="inline-flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-full pl-2.5 pr-1.5 py-0.5 text-xs text-slate-600">
+                                {p.model}
+                                <button onClick={() => handleDeleteCustomPanel(p.model)} className="text-slate-400 hover:text-red-500" title="削除">
+                                  <i className="fa-solid fa-xmark"></i>
+                                </button>
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-slate-500 mb-1.5">保存済みPCS項目</p>
+                        {customPcsList.length === 0 ? (
+                          <p className="text-xs text-slate-400">まだありません（PCS欄の「プリセット保存」で追加）</p>
+                        ) : (
+                          <div className="flex flex-wrap gap-1.5">
+                            {customPcsList.map(p => (
+                              <span key={p.model} className="inline-flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-full pl-2.5 pr-1.5 py-0.5 text-xs text-slate-600">
+                                {p.model}
+                                <button onClick={() => handleDeleteCustomPcs(p.model)} className="text-slate-400 hover:text-red-500" title="削除">
+                                  <i className="fa-solid fa-xmark"></i>
+                                </button>
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </section>
+
+                  <PanelForm
+                      panel={panel}
+                      onChange={handlePanelChange}
+                      onPresetSelect={handlePanelPresetSelect}
                       presets={panelPresets}
                       onSaveCustom={handleSaveCustomPanel}
                   />
@@ -2352,13 +2810,15 @@
                     )}
                   </button>
   
-                  <PcsListForm 
-                    pcsList={pcsList} 
-                    onAdd={handleAddPcs} 
+                  <PcsListForm
+                    pcsList={pcsList}
+                    onAdd={handleAddPcs}
                     onBulkAdd={handleBulkAddPcs}
-                    onRemove={handleRemovePcs} 
-                    onChange={handlePcsChange} 
+                    onRemove={handleRemovePcs}
+                    onChange={handlePcsChange}
                     onPresetSelect={handlePcsPresetSelect}
+                    presets={pcsPresets}
+                    onSaveCustom={handleSaveCustomPcs}
                   />
                   {/* Old ConditionForm Removed */}
                   
@@ -2400,9 +2860,120 @@
                 </div>
 
                 <div ref={rightPanelRef} className="space-y-6 overflow-y-auto xl:h-full scrollbar-hide pb-4">
+                  {aiErrorMessage ? (
+                    <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                      {aiErrorMessage}
+                    </div>
+                  ) : null}
+
+                  {aiSuggestion ? (
+                    <section className="bg-white rounded-xl p-6 shadow-sm border border-cyan-200">
+                      <div className="flex items-center justify-between gap-4 mb-4">
+                        <div>
+                          <h2 className="text-lg font-bold text-slate-800">AI自動設計の提案</h2>
+                          <p className="text-xs text-slate-500">元のUIは維持したまま、AI案だけ確認して適用できます</p>
+                        </div>
+                        {appliedBy === 'ai' ? (
+                          <span className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold">
+                            AI案を適用済み
+                          </span>
+                        ) : null}
+                      </div>
+
+                      <div className="space-y-4">
+                        <div className="rounded-lg bg-slate-50 border border-slate-200 p-4">
+                          <p className="text-sm leading-6 text-slate-700">{aiSuggestion.summary}</p>
+                        </div>
+
+                        {/* 電圧調整で再検討 */}
+                        <div className="rounded-lg border border-cyan-200 bg-cyan-50/50 p-4">
+                          <div className="flex items-center gap-2 mb-1">
+                            <i className="fa-solid fa-sliders text-cyan-600"></i>
+                            <h3 className="text-sm font-bold text-slate-700">電圧の狙いを変えて再検討</h3>
+                          </div>
+                          <p className="text-xs text-slate-500 mb-3">結果を見て、ストリングの直列枚数（電圧）を調整して再計算できます。</p>
+                          <div className="grid grid-cols-3 gap-2">
+                            {[
+                              { key: 'low', label: '電圧低め', sub: '直列少なめ' },
+                              { key: 'normal', label: '電圧普通', sub: '推奨・再検討' },
+                              { key: 'high', label: '電圧高め', sub: '直列多め' },
+                            ].map(opt => (
+                              <button
+                                key={opt.key}
+                                onClick={() => handleAiDesign(opt.key, true)}
+                                disabled={aiStatus === 'loading'}
+                                className={`px-3 py-2 rounded-lg text-sm font-bold border transition-all disabled:opacity-60 disabled:cursor-not-allowed ${aiVoltagePref === opt.key ? 'bg-cyan-600 text-white border-cyan-600 shadow' : 'bg-white text-slate-700 border-slate-300 hover:border-cyan-400 hover:bg-cyan-50'}`}
+                                title={opt.sub}
+                              >
+                                {aiStatus === 'loading' && aiVoltagePref === opt.key ? (
+                                  <><i className="fa-solid fa-spinner fa-spin mr-1"></i>計算中</>
+                                ) : (
+                                  <>
+                                    <div>{opt.label}</div>
+                                    <div className={`text-[10px] font-normal ${aiVoltagePref === opt.key ? 'text-cyan-100' : 'text-slate-400'}`}>{opt.sub}</div>
+                                  </>
+                                )}
+                              </button>
+                            ))}
+                          </div>
+                          <p className="text-[11px] text-slate-400 mt-2">※ 電圧高めは回路に空きが出ることがあります（適正範囲内で調整）。電圧低めは推奨直列の下限付近を狙います。</p>
+                        </div>
+
+                        {aiSuggestion.reasoning && aiSuggestion.reasoning.length > 0 ? (
+                          <div>
+                            <h3 className="text-sm font-bold text-slate-700 mb-2">考察</h3>
+                            <div className="space-y-2">
+                              {aiSuggestion.reasoning.map((item, index) => (
+                                <div key={`${item}-${index}`} className="text-sm text-slate-600 flex gap-2">
+                                  <span className="text-cyan-600 font-bold">{index + 1}.</span>
+                                  <span>{item}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ) : null}
+
+                        {aiSuggestion.warnings && aiSuggestion.warnings.length > 0 ? (
+                          <div>
+                            <h3 className="text-sm font-bold text-slate-700 mb-2">注意点</h3>
+                            <div className="space-y-2">
+                              {aiSuggestion.warnings.map((item, index) => (
+                                <div key={`${item}-${index}`} className="text-sm text-amber-700 flex gap-2">
+                                  <i className="fa-solid fa-triangle-exclamation mt-1"></i>
+                                  <span>{item}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ) : null}
+
+                        <div className="flex flex-wrap gap-3 pt-2">
+                          <button
+                            onClick={applyAiSuggestion}
+                            disabled={appliedBy === 'ai'}
+                            className="px-4 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-sm font-bold shadow transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                          >
+                            {appliedBy === 'ai' ? 'AI案を適用済み' : 'AI案を適用'}
+                          </button>
+                          <button
+                            onClick={dismissAiSuggestion}
+                            className="px-4 py-2 rounded-lg border border-slate-300 hover:bg-slate-50 text-slate-700 text-sm font-bold transition-all"
+                          >
+                            破棄
+                          </button>
+                        </div>
+                      </div>
+                    </section>
+                  ) : null}
                   
                   {finalResult ? (
                     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                      {appliedBy === 'ai' ? (
+                        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 flex items-center gap-2">
+                          <i className="fa-solid fa-sparkles"></i>
+                          <span>AI案を適用した状態です。下の割付表でそのまま微調整できます。</span>
+                        </div>
+                      ) : null}
                       <SummaryPanel 
                         result={finalResult} 
                         panel={panel} 

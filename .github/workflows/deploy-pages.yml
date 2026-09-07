@@ -1,0 +1,51 @@
+name: Deploy Pages (index.html only)
+
+# フロント(index.html)は単一ファイルで、割付ロジックは Cloudflare 側(functions/)。
+# そのため GitHub Pages は index.html / CNAME が変わった時だけ再デプロイする。
+# （毎コミットで再ビルドしてビルド回数のレート制限に当たるのを防ぐ）
+on:
+  push:
+    branches:
+      - main
+      - feature/ai-auto-design-gemini
+    paths:
+      - 'index.html'
+      - 'CNAME'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Stage static site (index.html + CNAME only)
+        run: |
+          mkdir -p _site
+          cp index.html _site/
+          if [ -f CNAME ]; then cp CNAME _site/; fi
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

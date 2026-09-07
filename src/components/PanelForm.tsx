@@ -1,14 +1,17 @@
 import React from 'react';
-import { PanelSpec } from '../types';
-import { Sun } from 'lucide-react';
+import { PanelPreset, PanelSpec } from '../types';
+import { Save, Sun } from 'lucide-react';
 import { InputField } from './ui/InputField';
 
 interface Props {
   panel: PanelSpec;
+  presets: PanelPreset[];
   onChange: (field: keyof PanelSpec, value: string | number) => void;
+  onPresetSelect: (model: string) => void;
+  onSaveCustom: () => void;
 }
 
-export const PanelForm: React.FC<Props> = ({ panel, onChange }) => {
+export const PanelForm: React.FC<Props> = ({ panel, presets, onChange, onPresetSelect, onSaveCustom }) => {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type } = e.target;
     const val = type === 'number' ? parseFloat(value) : value;
@@ -28,6 +31,41 @@ export const PanelForm: React.FC<Props> = ({ panel, onChange }) => {
       </div>
       
       <div className="p-6 space-y-6">
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-500">
+            保存済みパネル項目
+          </label>
+          <div className="flex flex-col gap-3 md:flex-row">
+            <select
+              className="block w-full rounded-md border-0 bg-white py-2 px-3 text-sm text-slate-900 ring-1 ring-inset ring-slate-300 transition-all duration-200 ease-in-out hover:ring-slate-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600"
+              value=""
+              onChange={(e) => {
+                if (e.target.value) {
+                  onPresetSelect(e.target.value);
+                }
+              }}
+            >
+              <option value="">保存済み項目を選択して反映</option>
+              {presets.map((preset) => (
+                <option key={preset.model} value={preset.model}>
+                  {preset.manufacturer} | {preset.model} ({preset.pmax}W)
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={onSaveCustom}
+              className="inline-flex items-center justify-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-700 transition-colors hover:bg-indigo-100"
+            >
+              <Save size={16} />
+              現在値を保存
+            </button>
+          </div>
+          <p className="mt-2 text-[10px] leading-tight text-slate-500">
+            メーカー・型式を含む現在の入力値をカスタム項目として保存します。
+          </p>
+        </div>
+
         {/* 基本情報 */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
           <InputField
